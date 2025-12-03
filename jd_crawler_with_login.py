@@ -42,17 +42,37 @@ class JDCrawlerWithLogin:
             if self.headless:
                 options.add_argument('--headless=new')
 
+            # 基础设置
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--window-size=1920,1080')
 
-            # 使用undetected_chromedriver创建浏览器实例
-            # 这会自动处理反检测，隐藏Selenium特征
+            # 注意：不添加 excludeSwitches 等 experimental_option
+            # undetected-chromedriver 会自动处理这些
+
+            # 使用 undetected_chromedriver 创建浏览器实例
+            # 明确指定 version_main 为 142 来匹配本地 Chrome 版本
+            print(f"  正在初始化浏览器（Chrome 142）...")
             self.driver = uc.Chrome(
                 options=options,
-                use_subprocess=True,
-                version_main=None  # 自动检测Chrome版本
+                version_main=142,
+                use_subprocess=False,  # 改为 False 可能更稳定
             )
+
+            # 额外的 JavaScript 注入，隐藏 webdriver 特征
+            self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                'source': '''
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => undefined
+                    });
+                    Object.defineProperty(navigator, 'plugins', {
+                        get: () => [1, 2, 3, 4, 5]
+                    });
+                    Object.defineProperty(navigator, 'languages', {
+                        get: () => ['zh-CN', 'zh', 'en-US', 'en']
+                    });
+                '''
+            })
 
             self.driver.implicitly_wait(5)
 
@@ -180,6 +200,24 @@ class JDCrawlerWithLogin:
             time.sleep(2)
             print("  ✓ 浏览器已重启并恢复登录状态")
 
+    def _simulate_human_behavior(self):
+        """模拟人类浏览行为，帮助绕过反爬检测"""
+        try:
+            # 先访问京东首页，表现得像真人
+            current_url = self.driver.current_url
+            if "jd.com" not in current_url or current_url == "data:,":
+                print("  先访问京东首页...")
+                self.driver.get("https://www.jd.com")
+                time.sleep(2)
+
+                # 模拟滚动
+                self.driver.execute_script("window.scrollTo(0, 300);")
+                time.sleep(0.5)
+                self.driver.execute_script("window.scrollTo(0, 0);")
+                time.sleep(1)
+        except Exception as e:
+            print(f"  模拟人类行为时出错: {e}")
+
     def get_price(self, url: str, timeout: int = 10) -> Optional[float]:
         """
         获取商品价格
@@ -200,9 +238,12 @@ class JDCrawlerWithLogin:
             if not self._check_driver_alive():
                 self._restart_driver()
 
+            # 先模拟人类行为
+            self._simulate_human_behavior()
+
             print(f"  正在访问: {url}")
             self.driver.get(url)
-            time.sleep(2)
+            time.sleep(3)  # 增加等待时间
 
             # 验证URL是否正确加载
             current_url = self.driver.current_url

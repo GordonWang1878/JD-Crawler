@@ -27,6 +27,10 @@ wheels/
 jd_cookies.pkl
 *.pkl
 
+# ChromeDriver 可执行文件
+chromedriver_*
+chromedriver
+
 # 测试和调试文件
 test_*.py
 debug_*.py
@@ -57,3 +61,11 @@ Price_Marks_test.xlsx
 # Excel临时文件
 ~$*.xlsx
 ~$*.xls
+
+# 旧版本文件（已废弃）
+jd_price_crawler.py
+jd_price_crawler_v*.py
+jd_price_crawler_selenium.py
+jd_price_crawler_improved.py
+jd_price_crawler_final.py
+main.py
