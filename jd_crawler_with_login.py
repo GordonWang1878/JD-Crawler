@@ -2,14 +2,12 @@
 """
 京东价格爬虫 - 支持登录版本
 第一次运行会打开浏览器让用户手动登录，之后自动使用保存的cookies
+使用undetected-chromedriver绕过反爬检测
 """
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.chrome.options import Options
+import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 import time
 import json
 import os
@@ -36,20 +34,31 @@ class JDCrawlerWithLogin:
         self._init_driver()
 
     def _init_driver(self):
-        """初始化Chrome驱动"""
-        chrome_options = Options()
-        if self.headless:
-            chrome_options.add_argument('--headless=new')
+        """初始化Chrome驱动 - 使用undetected_chromedriver绕过反爬检测"""
+        try:
+            options = uc.ChromeOptions()
 
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--window-size=1920,1080')
-        chrome_options.add_argument(
-            'user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        )
+            # 基本设置
+            if self.headless:
+                options.add_argument('--headless=new')
 
-        service = ChromeService(ChromeDriverManager().install())
-        self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--window-size=1920,1080')
+
+            # 使用undetected_chromedriver创建浏览器实例
+            # 这会自动处理反检测，隐藏Selenium特征
+            self.driver = uc.Chrome(
+                options=options,
+                use_subprocess=True,
+                version_main=None  # 自动检测Chrome版本
+            )
+
+            self.driver.implicitly_wait(5)
+
+        except Exception as e:
+            print(f"初始化驱动失败: {str(e)}")
+            raise
 
     def save_cookies(self):
         """保存cookies到文件"""
@@ -191,8 +200,18 @@ class JDCrawlerWithLogin:
             if not self._check_driver_alive():
                 self._restart_driver()
 
+            print(f"  正在访问: {url}")
             self.driver.get(url)
-            time.sleep(4)  # 增加等待时间，确保页格加载完成
+            time.sleep(2)
+
+            # 验证URL是否正确加载
+            current_url = self.driver.current_url
+            if url not in current_url and current_url not in url:
+                print(f"  ⚠️  URL不匹配！")
+                print(f"    请求: {url}")
+                print(f"    实际: {current_url}")
+
+            time.sleep(2)  # 再等待，确保页面加载完成
 
             # 等待价格元素加载
             wait = WebDriverWait(self.driver, timeout)
