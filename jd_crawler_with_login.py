@@ -142,6 +142,35 @@ class JDCrawlerWithLogin:
             print("\n✗ 登录失败或未完成登录")
             self.is_logged_in = False
 
+    def _check_driver_alive(self) -> bool:
+        """检查driver是否还活着"""
+        try:
+            if self.driver:
+                _ = self.driver.current_url
+                return True
+        except:
+            return False
+        return False
+
+    def _restart_driver(self):
+        """重启driver"""
+        print("  检测到浏览器已关闭，正在重新启动...")
+        try:
+            if self.driver:
+                self.driver.quit()
+        except:
+            pass
+
+        self.driver = None
+        self._init_driver()
+
+        # 重新加载cookies
+        if os.path.exists(self.cookies_file):
+            self.load_cookies()
+            self.driver.get("https://www.jd.com")
+            time.sleep(2)
+            print("  ✓ 浏览器已重启并恢复登录状态")
+
     def get_price(self, url: str, timeout: int = 10) -> Optional[float]:
         """
         获取商品价格
@@ -158,37 +187,52 @@ class JDCrawlerWithLogin:
             return None
 
         try:
+            # 检查浏览器是否还活着
+            if not self._check_driver_alive():
+                self._restart_driver()
+
             self.driver.get(url)
-            time.sleep(3)  # 等待页面加载
+            time.sleep(4)  # 增加等待时间，确保页格加载完成
 
             # 等待价格元素加载
             wait = WebDriverWait(self.driver, timeout)
 
-            # 多种价格元素选择器
+            # 多种价格元素选择器（按优先级排序）
             price_selectors = [
-                (By.XPATH, "//span[@class='price J-p-']"),
+                # 优先：最常见的价格元素
+                (By.XPATH, "//span[@class='price J-p-100140584252']"),  # 特定商品ID的价格
+                (By.XPATH, "//span[contains(@class,'price') and contains(@class,'J-p-')]"),
+                (By.XPATH, "//div[@class='dd']//span[@class='price']"),
                 (By.XPATH, "//span[@class='p-price']//span[@class='price']"),
                 (By.XPATH, "//div[@class='summary-price']//span[@class='price']"),
-                (By.CLASS_NAME, "p-price"),
+                # 备用：其他可能的位置
+                (By.CSS_SELECTOR, ".price-tag"),
+                (By.CSS_SELECTOR, ".jd-price"),
             ]
 
             for by, selector in price_selectors:
                 try:
+                    # 等待元素出现
                     element = wait.until(EC.presence_of_element_located((by, selector)))
 
                     # 多次尝试获取文本（等待JavaScript填充价格）
-                    for attempt in range(8):
+                    for attempt in range(10):
                         text = element.text.strip()
-                        if text and text not in ['¥', '￥', '']:
-                            # 提取数字
-                            match = re.search(r'(\d+\.?\d*)', text)
+
+                        # 清理文本
+                        text = text.replace('¥', '').replace('￥', '').replace(',', '').strip()
+
+                        if text and text not in ['', '登录']:
+                            # 提取数字（支持小数）
+                            match = re.search(r'(\d+(?:\.\d{1,2})?)', text)
                             if match:
                                 price = float(match.group(1))
                                 if 1 < price < 100000:  # 合理范围
                                     return price
-                        time.sleep(0.5)
 
-                except Exception:
+                        time.sleep(0.6)
+
+                except Exception as e:
                     continue
 
             # 备用方法：使用JavaScript查找
