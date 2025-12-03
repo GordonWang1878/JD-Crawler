@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 京东登录凭据（不要提交到git）
+jd_cookies.pkl
+*.pkl
+
+# 测试和调试文件
+test_*.py
+debug_*.py
+inspect_*.py
+find_*.py
+*_test.py
+test_page.html
+page_*.html
+screenshot_*.png
+*.log
+
+# Excel测试输出
+Price_Marks_test.xlsx
+*_backup_*.xlsx
+
+# 临时文件
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Excel临时文件
+~$*.xlsx
+~$*.xls
