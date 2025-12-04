@@ -175,8 +175,8 @@ class JDCrawlerViaSearch:
                             return None
 
                         # 提取价格
-                        price = self._extract_price()
-                        return price
+                        prices = self._extract_price()
+                        return prices
                     else:
                         print(f"  ✗ 未找到合适的商品链接")
                         return None
@@ -193,37 +193,134 @@ class JDCrawlerViaSearch:
             print(f"  ✗ 错误: {e}")
             return None
 
-    def _extract_price(self) -> Optional[float]:
-        """从当前页面提取价格"""
-        try:
-            wait = WebDriverWait(self.driver, 10)
+    def _extract_price(self) -> Optional[dict]:
+        """
+        从当前页面提取价格（包括原价和促销价）
 
-            # 价格选择器
-            price_selectors = [
-                (By.XPATH, "//span[contains(@class,'price') and contains(@class,'J-p-')]"),
-                (By.XPATH, "//div[@class='dd']//span[@class='price']"),
-                (By.CSS_SELECTOR, ".price-tag"),
+        Returns:
+            字典格式: {'original': float, 'promo': float} 或 None
+            如果只有一个价格，promo 为 None
+        """
+        try:
+            time.sleep(2)  # 等待价格加载
+
+            prices = {
+                'original': None,
+                'promo': None
+            }
+
+            # 1. 尝试提取促销价（实际售价）- 在 finalPrice 元素中
+            promo_selectors = [
+                (By.CSS_SELECTOR, ".finalPrice .price"),  # 促销价的关键选择器
+                (By.XPATH, "//span[@class='finalPrice']//span[@class='price']"),
             ]
 
-            for by, selector in price_selectors:
+            for by, selector in promo_selectors:
                 try:
-                    element = wait.until(EC.presence_of_element_located((by, selector)))
-                    for _ in range(10):
+                    elements = self.driver.find_elements(by, selector)
+                    for element in elements[:3]:  # 只检查前3个
+                        for _ in range(5):
+                            text = element.text.strip()
+                            text = text.replace('¥', '').replace('￥', '').replace(',', '').strip()
+                            if text and text not in ['', '登录']:
+                                match = re.search(r'(\d+(?:\.\d{1,2})?)', text)
+                                if match:
+                                    price = float(match.group(1))
+                                    if 1 < price < 100000:
+                                        prices['promo'] = price
+                                        print(f"  找到促销价: ¥{price}")
+                                        break
+                            time.sleep(0.3)
+                        if prices['promo']:
+                            break
+                    if prices['promo']:
+                        break
+                except:
+                    continue
+
+            # 2. 尝试提取原价 - 在 p-price jdPrice 元素中
+            original_selectors = [
+                (By.CSS_SELECTOR, ".p-price.jdPrice .price"),  # 原价的关键选择器
+                (By.XPATH, "//span[@class='p-price jdPrice']//span[contains(@class,'price')]"),
+                (By.CSS_SELECTOR, ".del"),  # 备用：常见的删除线价格
+                (By.XPATH, "//del"),
+            ]
+
+            for by, selector in original_selectors:
+                try:
+                    elements = self.driver.find_elements(by, selector)
+                    for element in elements:
                         text = element.text.strip()
                         text = text.replace('¥', '').replace('￥', '').replace(',', '').strip()
-                        if text and text not in ['', '登录']:
+                        if text:
                             match = re.search(r'(\d+(?:\.\d{1,2})?)', text)
                             if match:
                                 price = float(match.group(1))
                                 if 1 < price < 100000:
-                                    return price
-                        time.sleep(0.6)
+                                    prices['original'] = price
+                                    print(f"  找到原价: ¥{price}")
+                                    break
+                    if prices['original']:
+                        break
                 except:
                     continue
 
-            return None
+            # 3. 使用 JavaScript 查找所有价格相关元素
+            if not prices['promo'] or not prices['original']:
+                js_script = """
+                var results = [];
+                var elements = document.querySelectorAll('span, div, del');
+                for (var i = 0; i < elements.length; i++) {
+                    var text = elements[i].textContent || elements[i].innerText;
+                    text = text.trim();
+                    if (text.match(/^[¥￥]?\\s*\\d+\\.\\d{1,2}$/)) {
+                        var price = text.replace(/[¥￥]/g, '').trim();
+                        var isDel = elements[i].tagName === 'DEL';
+                        results.push({
+                            price: parseFloat(price),
+                            isDel: isDel,
+                            className: elements[i].className
+                        });
+                    }
+                }
+                return results;
+                """
+
+                try:
+                    js_prices = self.driver.execute_script(js_script)
+                    if js_prices:
+                        print(f"  JavaScript找到 {len(js_prices)} 个价格候选")
+                        for item in js_prices:
+                            price = item['price']
+                            if 1 < price < 100000:
+                                if item['isDel'] and not prices['original']:
+                                    prices['original'] = price
+                                    print(f"  JS找到原价: ¥{price}")
+                                elif not item['isDel'] and not prices['promo']:
+                                    prices['promo'] = price
+                                    print(f"  JS找到促销价: ¥{price}")
+                except Exception as e:
+                    print(f"  JS提取失败: {e}")
+
+            # 4. 如果只找到一个价格，可能没有促销
+            if prices['promo'] and not prices['original']:
+                # 只有促销价，可能就是正常价格
+                print(f"  只找到一个价格，可能无促销")
+            elif prices['original'] and not prices['promo']:
+                # 只有原价，可能促销价加载失败
+                print(f"  只找到原价，促销价可能未加载")
+
+            # 返回结果
+            if prices['promo'] or prices['original']:
+                return prices
+            else:
+                print(f"  未找到任何价格")
+                return None
+
         except Exception as e:
             print(f"  提取价格失败: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def close(self):
@@ -245,10 +342,30 @@ if __name__ == "__main__":
             # 测试
             product_id = "100140584252"
             print(f"\n测试商品ID: {product_id}")
-            price = crawler.get_price_via_search(product_id)
+            print(f"预期: 原价 ¥79.90, 促销价 ¥67.91")
+            print()
 
-            if price:
-                print(f"\n✅ 成功！价格: ¥{price}")
+            prices = crawler.get_price_via_search(product_id)
+
+            if prices:
+                print(f"\n" + "=" * 70)
+                print("✅ 提取成功！")
+                print("=" * 70)
+                if prices.get('original'):
+                    print(f"  原价: ¥{prices['original']}")
+                if prices.get('promo'):
+                    print(f"  促销价: ¥{prices['promo']}")
+
+                # 验证
+                if prices.get('original') == 79.90 and prices.get('promo') == 67.91:
+                    print("\n🎉 完美！两个价格都正确！")
+                elif prices.get('promo') == 67.91:
+                    print("\n✅ 促销价正确！")
+                elif prices.get('original') == 79.90:
+                    print("\n✅ 原价正确！")
+                else:
+                    print("\n⚠️  价格与预期不符")
+
             else:
                 print(f"\n✗ 获取失败")
 
