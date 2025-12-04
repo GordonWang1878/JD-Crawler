@@ -42,7 +42,8 @@ page_*.html
 screenshot_*.png
 *.log
 
-# Excel测试输出
+# Excel输出文件（数据文件，不提交到git）
+Price Marks.xlsx
 Price_Marks_test.xlsx
 *_backup_*.xlsx
 
