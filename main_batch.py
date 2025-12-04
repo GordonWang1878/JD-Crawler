@@ -190,28 +190,67 @@ def main():
         print(f"\n正在保存结果到 {output_file}...")
 
         try:
-            # 读取现有数据
-            if os.path.exists(output_file):
-                try:
-                    df_existing = pd.read_excel(output_file, sheet_name='Marks')
-                    print(f"  发现现有数据 {len(df_existing)} 条")
-                except:
-                    df_existing = pd.DataFrame(columns=['Runtime', 'URL', 'Price', 'Promotion Price'])
-            else:
-                df_existing = pd.DataFrame(columns=['Runtime', 'URL', 'Price', 'Promotion Price'])
+            from openpyxl import load_workbook
+            from openpyxl.utils.dataframe import dataframe_to_rows
 
             # 创建新数据
             df_new = pd.DataFrame(results)
 
-            # 合并（新数据在上面）
-            df_combined = pd.concat([df_new, df_existing], ignore_index=True)
+            if os.path.exists(output_file):
+                # 文件存在，追加数据（保留 Excel Table 格式）
+                print(f"  检测到现有文件，追加新数据...")
 
-            # 保存
-            with pd.ExcelWriter(output_file, engine='openpyxl', mode='w') as writer:
-                df_combined.to_excel(writer, sheet_name='Marks', index=False)
+                # 加载现有工作簿
+                wb = load_workbook(output_file)
 
-            print(f"✓ 成功保存 {len(df_new)} 条新记录")
-            print(f"  总记录数: {len(df_combined)}")
+                # 获取 Marks sheet
+                if 'Marks' in wb.sheetnames:
+                    ws = wb['Marks']
+
+                    # 找到表格（如果存在）
+                    table = None
+                    if ws.tables:
+                        table_name = list(ws.tables.keys())[0]
+                        table = ws.tables[table_name]
+                        print(f"  发现 Excel Table: {table_name}")
+
+                    # 找到最后一行
+                    last_row = ws.max_row
+
+                    # 读取现有数据行数
+                    existing_count = last_row - 1  # 减去表头
+
+                    # 追加新数据（从最后一行的下一行开始）
+                    for r_idx, row in enumerate(dataframe_to_rows(df_new, index=False, header=False), start=last_row + 1):
+                        for c_idx, value in enumerate(row, start=1):
+                            ws.cell(row=r_idx, column=c_idx, value=value)
+
+                    # 如果有 Table，扩展其范围
+                    if table:
+                        # 计算新的表格范围
+                        new_last_row = last_row + len(df_new)
+                        # 获取列数
+                        num_cols = len(df_new.columns)
+                        # 更新表格范围
+                        from openpyxl.utils import get_column_letter
+                        new_ref = f"A1:{get_column_letter(num_cols)}{new_last_row}"
+                        table.ref = new_ref
+                        print(f"  已扩展 Table 范围到: {new_ref}")
+
+                    # 保存
+                    wb.save(output_file)
+                    print(f"✓ 成功追加 {len(df_new)} 条新记录")
+                    print(f"  总记录数: {existing_count + len(df_new)}")
+
+                else:
+                    # Sheet 不存在，创建新的
+                    df_new.to_excel(output_file, sheet_name='Marks', index=False)
+                    print(f"✓ 创建新表格，保存 {len(df_new)} 条记录")
+
+            else:
+                # 文件不存在，创建新文件
+                df_new.to_excel(output_file, sheet_name='Marks', index=False)
+                print(f"✓ 创建新文件，保存 {len(df_new)} 条记录")
 
             # 显示Excel列格式
             print("\nExcel 列格式:")
