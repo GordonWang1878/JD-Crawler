@@ -80,7 +80,7 @@ class JDCrawlerViaSearch:
 
     def get_price_via_search(self, product_id: str) -> Optional[float]:
         """
-        通过搜索获取价格
+        获取商品价格（直接访问，避免搜索触发验证）
 
         Args:
             product_id: 商品ID，例如 "100140584252"
@@ -90,104 +90,34 @@ class JDCrawlerViaSearch:
             return None
 
         try:
-            # 访问京东首页
-            print(f"  访问京东首页...")
-            self.driver.get("https://www.jd.com")
-            time.sleep(2)
+            # 直接构造商品URL
+            product_url = f"https://item.jd.com/{product_id}.html"
 
-            # 模拟人类浏览
-            self.driver.execute_script("window.scrollTo(0, 300);")
-            time.sleep(1)
+            print(f"  直接访问商品页...")
+            self.driver.get(product_url)
+            time.sleep(4)  # 多等一会确保加载
 
-            # 在搜索框搜索商品ID
-            print(f"  搜索商品ID: {product_id}")
-            search_box = self.driver.find_element(By.ID, "key")
-            search_box.clear()
-            time.sleep(0.5)
-
-            # 模拟人类打字，一个字符一个字符输入
-            for char in product_id:
-                search_box.send_keys(char)
-                time.sleep(0.1)
-
-            time.sleep(0.5)
-            search_box.send_keys(Keys.RETURN)
-
-            print(f"  等待搜索结果...")
-            time.sleep(3)
-
-            # 检查是否被重定向到403页面
+            # 检查当前URL
             current_url = self.driver.current_url
+
+            # 检查是否被重定向到403
             if "403" in current_url or "www.jd.com/?from" in current_url:
-                print(f"  ⚠️  仍然被检测到")
+                print(f"  ⚠️  被重定向到403")
                 return None
 
-            # 查找商品链接（搜索结果中的第一个）
-            try:
-                # 等待搜索结果加载
-                wait = WebDriverWait(self.driver, 10)
-                # 查找商品链接
-                product_links = self.driver.find_elements(By.CSS_SELECTOR, f"a[href*='{product_id}']")
+            # 检查是否被重定向到验证页面
+            if "risk_handler" in current_url or "验证" in self.driver.title:
+                print(f"  ⚠️  触发验证页面")
+                print(f"     请在浏览器中手动完成验证，然后等待...")
+                # 等待用户手动验证
+                time.sleep(15)
+                # 重新访问商品页
+                self.driver.get(product_url)
+                time.sleep(4)
 
-                if product_links:
-                    print(f"  找到商品链接，点击进入...")
-
-                    # 先关闭可能的弹窗或遮挡物
-                    try:
-                        # 尝试关闭图片放大层
-                        self.driver.execute_script("document.querySelectorAll('.zoomed-image').forEach(el => el.style.display='none');")
-                        time.sleep(0.5)
-                    except:
-                        pass
-
-                    # 找到商品详情页的链接（必须是 item.jd.com/{product_id}.html 格式）
-                    target_link = None
-                    target_href = None
-
-                    # 首先尝试直接查找标准的商品页链接
-                    standard_url = f"https://item.jd.com/{product_id}.html"
-
-                    for link in product_links:
-                        href = link.get_attribute('href')
-                        if not href:
-                            continue
-
-                        # 必须是 item.jd.com/{product_id}.html 格式
-                        if f'item.jd.com/{product_id}.html' in href:
-                            target_link = link
-                            target_href = href
-                            break
-
-                    # 如果没找到，直接构造标准URL
-                    if not target_href:
-                        print(f"  未找到标准商品链接，使用构造的URL")
-                        target_href = standard_url
-
-                    if target_href:
-                        print(f"  导航到商品页: {target_href}")
-                        self.driver.get(target_href)
-                        time.sleep(3)
-
-                        # 检查是否被重定向到403
-                        current_url = self.driver.current_url
-                        if "403" in current_url or "www.jd.com/?from" in current_url:
-                            print(f"  ⚠️  点击后被重定向到403")
-                            return None
-
-                        # 提取价格
-                        prices = self._extract_price()
-                        return prices
-                    else:
-                        print(f"  ✗ 未找到合适的商品链接")
-                        return None
-                else:
-                    print(f"  ✗ 未找到商品链接")
-                    return None
-            except Exception as e:
-                print(f"  ✗ 查找商品链接失败: {e}")
-                import traceback
-                traceback.print_exc()
-                return None
+            # 提取价格
+            prices = self._extract_price()
+            return prices
 
         except Exception as e:
             print(f"  ✗ 错误: {e}")
