@@ -253,10 +253,45 @@ class JDCrawlerViaSearch:
             traceback.print_exc()
             return None
 
+    def is_session_valid(self) -> bool:
+        """检查浏览器会话是否有效"""
+        try:
+            # 尝试获取当前URL来检测会话
+            _ = self.driver.current_url
+            return True
+        except:
+            return False
+
+    def restart_browser(self):
+        """重启浏览器并重新登录"""
+        print("\n  ⚠️  检测到浏览器会话失效，正在重启...")
+        try:
+            if self.driver:
+                self.driver.quit()
+        except:
+            pass
+
+        # 重新初始化
+        self._init_driver()
+
+        # 重新登录
+        print("  重新登录...")
+        self.login()
+
+        if self.is_logged_in:
+            print("  ✓ 浏览器重启成功！\n")
+            return True
+        else:
+            print("  ✗ 重新登录失败\n")
+            return False
+
     def close(self):
         """关闭浏览器"""
         if self.driver:
-            self.driver.quit()
+            try:
+                self.driver.quit()
+            except:
+                pass
 
 
 if __name__ == "__main__":

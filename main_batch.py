@@ -104,6 +104,12 @@ def main():
         for idx, url in enumerate(urls, 1):
             print(f"[{idx}/{len(urls)}] {url}")
 
+            # 定期重启浏览器（每50个商品），避免内存泄漏
+            if idx > 1 and (idx - 1) % 50 == 0:
+                print(f"\n  🔄 已完成 {idx-1} 个商品，重启浏览器释放内存...\n")
+                crawler.restart_browser()
+                time.sleep(3)
+
             # 提取商品ID
             match = re.search(r'/(\d+)\.html', url)
             if not match:
@@ -119,9 +125,45 @@ def main():
 
             product_id = match.group(1)
 
-            # 获取价格
+            # 获取价格（带重试机制）
+            max_retries = 2
+            retry_count = 0
+            prices = None
+
+            while retry_count <= max_retries:
+                try:
+                    # 检查会话是否有效
+                    if not crawler.is_session_valid():
+                        print(f"  ⚠️  会话失效，尝试重启浏览器...")
+                        if not crawler.restart_browser():
+                            print(f"  ✗ 浏览器重启失败")
+                            break
+                        time.sleep(2)
+
+                    prices = crawler.get_price_via_search(product_id)
+                    break  # 成功则退出重试循环
+
+                except Exception as e:
+                    error_msg = str(e)
+                    if "invalid session id" in error_msg.lower():
+                        retry_count += 1
+                        if retry_count <= max_retries:
+                            print(f"  ⚠️  会话失效，第 {retry_count} 次重试...")
+                            if crawler.restart_browser():
+                                time.sleep(2)
+                                continue
+                            else:
+                                print(f"  ✗ 浏览器重启失败")
+                                break
+                        else:
+                            print(f"  ✗ 重试 {max_retries} 次后仍失败")
+                            break
+                    else:
+                        # 其他错误直接抛出
+                        raise
+
+            # 处理结果
             try:
-                prices = crawler.get_price_via_search(product_id)
 
                 if prices:
                     original = prices.get('original')
