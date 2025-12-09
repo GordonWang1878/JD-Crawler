@@ -167,7 +167,15 @@ class JDCrawlerViaSearch:
 
             print(f"  直接访问商品页...")
             self.driver.get(product_url)
-            time.sleep(3)  # 等待页面加载（优化后：4s→3s）
+
+            # 智能等待：等待页面关键元素出现（最多3秒）
+            # 可能出现的元素：价格区域、下架提示、验证页面
+            try:
+                WebDriverWait(self.driver, 3).until(
+                    lambda d: d.find_element(By.TAG_NAME, "body")
+                )
+            except:
+                pass  # 超时也继续，后续逻辑会处理
 
             # 检查当前URL
             current_url = self.driver.current_url
@@ -205,7 +213,13 @@ class JDCrawlerViaSearch:
                 time.sleep(15)
                 # 重新访问商品页
                 self.driver.get(product_url)
-                time.sleep(4)
+                # 智能等待页面加载
+                try:
+                    WebDriverWait(self.driver, 4).until(
+                        lambda d: d.find_element(By.TAG_NAME, "body")
+                    )
+                except:
+                    pass
 
             # 提取价格
             prices = self._extract_price()
@@ -229,7 +243,14 @@ class JDCrawlerViaSearch:
             字典格式: {'original': float, 'promo': float} 或 None
         """
         try:
-            time.sleep(1.5)  # 等待价格加载（优化后：2s→1.5s）
+            # 智能等待：等待价格相关元素出现（最多2秒）
+            try:
+                WebDriverWait(self.driver, 2).until(
+                    lambda d: len(d.find_elements(By.CSS_SELECTOR, ".p-price, .price, #summary-price")) > 0
+                )
+            except:
+                # 超时也继续，可能是下架商品或其他情况
+                pass
 
             prices = {
                 'original': None,
