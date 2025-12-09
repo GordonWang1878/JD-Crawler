@@ -298,6 +298,27 @@ class JDCrawlerViaSearch:
                         }
 
                         if (!shouldSkip) {
+                            // 检查是否有删除线（标签或CSS样式）
+                            var hasStrikethrough = false;
+
+                            // 方法1：检查是否是<del>标签
+                            if (elem.tagName === 'DEL') {
+                                hasStrikethrough = true;
+                            }
+
+                            // 方法2：检查是否在<del>标签内
+                            if (!hasStrikethrough && elem.closest && elem.closest('del')) {
+                                hasStrikethrough = true;
+                            }
+
+                            // 方法3：检查CSS样式
+                            if (!hasStrikethrough) {
+                                var computedStyle = window.getComputedStyle(elem);
+                                if (computedStyle.textDecoration && computedStyle.textDecoration.includes('line-through')) {
+                                    hasStrikethrough = true;
+                                }
+                            }
+
                             results.push({
                                 price: price,
                                 text: text,
@@ -305,7 +326,7 @@ class JDCrawlerViaSearch:
                                 tagName: elem.tagName,
                                 className: elem.className || '',
                                 parentClassName: parent ? (parent.className || '') : '',
-                                isDel: elem.tagName === 'DEL'
+                                isDel: hasStrikethrough
                             });
                         }
                     }
