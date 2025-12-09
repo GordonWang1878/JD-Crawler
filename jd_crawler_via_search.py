@@ -280,7 +280,7 @@ class JDCrawlerViaSearch:
                         // 注意：不能用单字"日"，会误杀"日常价"
                         var skipKeywords = ['积分', '优惠券', '满减', '津贴', '红包', '库存', '评价', '已购', '运费', '邮费',
                                           '月日', '时:', '分:', '点:', '前付', 'mAh', 'MAH', '毫安', '容量', '送达',
-                                          '功率', 'W大', 'W快', 'W闪', '颜色', '版本', '规格'];
+                                          '功率', 'W大', 'W快', 'W闪', '颜色', '版本', '规格', '限时达', '京准达', '物流'];
                         var shouldSkip = false;
 
                         // 检查是否包含日期时间格式（如"12月11日"、"19:30"）
@@ -349,7 +349,8 @@ class JDCrawlerViaSearch:
             if len(all_prices) <= 15:
                 for item in all_prices:
                     context_preview = item['context'][:50] if len(item['context']) > 50 else item['context']
-                    print(f"    候选: ¥{item['price']} - {context_preview}")
+                    del_mark = " [删除线]" if item.get('isDel', False) else ""
+                    print(f"    候选: ¥{item['price']}{del_mark} - {context_preview}")
 
             # 去重：相同价格只保留一个
             unique_prices = {}
