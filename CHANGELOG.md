@@ -1,56 +1,5 @@
 # 更新日志
 
-## 2025-12-09 - P3 性能优化：智能等待
-
-### ⚡ 性能优化
-
-#### 智能等待替代固定延迟
-**目标**：用 Selenium 的 WebDriverWait 替代固定的 time.sleep()，在保证稳定性的同时进一步提升性能
-
-**优化原理**：
-- **固定等待**：`time.sleep(3)` 总是等待3秒，即使页面1秒就加载完成
-- **智能等待**：`WebDriverWait(driver, 3)` 最多等待3秒，元素出现立即继续
-- **实际效果**：平均节省 0.5-1.5 秒/商品
-
-**优化位置**：
-
-| 位置 | 原来 | 优化后 | 说明 |
-|------|------|--------|------|
-| 页面加载 | `time.sleep(3)` | `WebDriverWait(body, 3)` | 等待body元素加载 |
-| 价格加载 | `time.sleep(1.5)` | `WebDriverWait(price, 2)` | 等待价格元素出现 |
-| 验证后加载 | `time.sleep(4)` | `WebDriverWait(body, 4)` | 验证后重新加载 |
-
-**核心代码**：
-```python
-# 页面加载智能等待
-WebDriverWait(self.driver, 3).until(
-    lambda d: d.find_element(By.TAG_NAME, "body")
-)
-
-# 价格元素智能等待
-WebDriverWait(self.driver, 2).until(
-    lambda d: len(d.find_elements(By.CSS_SELECTOR, ".p-price, .price, #summary-price")) > 0
-)
-```
-
-**性能提升**：
-- **平均节省**：约 0.8秒/商品（实际加载比固定等待快）
-- **194个商品总节省**：约 2.5-5 分钟
-- **累计优化效果**（P2+P3）：30分钟 → **约15-17分钟**
-- **总性能提升**：约 **43-50%** 🎉
-
-**稳定性提升**：
-- ✅ 确保必要元素加载完成才继续
-- ✅ 减少因页面未加载完导致的失败
-- ✅ 更智能地应对网络波动
-
-**代码改动**：
-- `jd_crawler_via_search.py:171-178` - 页面加载智能等待
-- `jd_crawler_via_search.py:240-247` - 价格加载智能等待
-- `jd_crawler_via_search.py:216-222` - 验证后加载智能等待
-
----
-
 ## 2025-12-09 - P2 性能优化：减少等待时间
 
 ### ⚡ 性能优化
