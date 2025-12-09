@@ -352,12 +352,23 @@ class JDCrawlerViaSearch:
                     del_mark = " [删除线]" if item.get('isDel', False) else ""
                     print(f"    候选: ¥{item['price']}{del_mark} - {context_preview}")
 
-            # 去重：相同价格只保留一个
+            # 去重：相同价格优先保留有明确标注的（删除线、关键词等）
             unique_prices = {}
             for item in all_prices:
                 price = item['price']
                 if price not in unique_prices:
+                    # 第一次遇到这个价格，直接保存
                     unique_prices[price] = item
+                else:
+                    # 已存在这个价格，优先保留有删除线或关键词标注的
+                    existing = unique_prices[price]
+                    # 如果新的有删除线，旧的没有，替换
+                    if item.get('isDel', False) and not existing.get('isDel', False):
+                        unique_prices[price] = item
+                    # 如果新的上下文包含价格关键词，旧的没有，替换
+                    elif any(kw in item.get('context', '') for kw in ['日常价', '原价', '到手价', '补贴价', '划线价']):
+                        if not any(kw in existing.get('context', '') for kw in ['日常价', '原价', '到手价', '补贴价', '划线价']):
+                            unique_prices[price] = item
 
             all_prices = list(unique_prices.values())
 
