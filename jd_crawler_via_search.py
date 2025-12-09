@@ -167,7 +167,7 @@ class JDCrawlerViaSearch:
 
             print(f"  直接访问商品页...")
             self.driver.get(product_url)
-            time.sleep(4)  # 多等一会确保加载
+            time.sleep(3)  # 等待页面加载（优化后：4s→3s）
 
             # 检查当前URL
             current_url = self.driver.current_url
@@ -229,7 +229,7 @@ class JDCrawlerViaSearch:
             字典格式: {'original': float, 'promo': float} 或 None
         """
         try:
-            time.sleep(2)  # 等待价格加载
+            time.sleep(1.5)  # 等待价格加载（优化后：2s→1.5s）
 
             prices = {
                 'original': None,

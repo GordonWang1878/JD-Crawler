@@ -103,7 +103,7 @@ def main():
             if idx > 1 and (idx - 1) % 50 == 0:
                 print(f"\n  🔄 已完成 {idx-1} 个商品，重启浏览器释放内存...\n")
                 crawler.restart_browser()
-                time.sleep(3)
+                time.sleep(2)  # 优化后：3s → 2s
 
             # 提取商品ID
             match = re.search(r'/(\d+)\.html', url)
@@ -135,7 +135,7 @@ def main():
                         if not crawler.restart_browser():
                             print(f"  ✗ 浏览器重启失败")
                             break
-                        time.sleep(2)
+                        time.sleep(1.5)  # 优化后：2s → 1.5s
 
                     prices = crawler.get_price_via_search(product_id)
                     break  # 成功则退出重试循环
@@ -147,7 +147,7 @@ def main():
                         if retry_count <= max_retries:
                             print(f"  ⚠️  会话失效，第 {retry_count} 次重试...")
                             if crawler.restart_browser():
-                                time.sleep(2)
+                                time.sleep(1.5)  # 优化后：2s → 1.5s
                                 continue
                             else:
                                 print(f"  ✗ 浏览器重启失败")
@@ -235,7 +235,7 @@ def main():
 
             # 添加延迟
             if idx < len(urls):
-                delay = random.uniform(3, 5)
+                delay = random.uniform(2, 3)  # 优化后：3-5s → 2-3s
                 print(f"  等待 {delay:.1f} 秒...\n")
                 time.sleep(delay)
 
