@@ -4,6 +4,10 @@
 支持原价和促销价双价格提取
 使用搜索方式绕过反爬检测
 """
+import warnings
+# 抑制 urllib3 的 OpenSSL 警告
+warnings.filterwarnings('ignore', message='urllib3 v2 only supports OpenSSL 1.1.1+')
+
 import pandas as pd
 from datetime import datetime
 import time
@@ -18,13 +22,6 @@ def main():
     print("=" * 70)
     print("京东价格批量爬取工具 - 双价格版本")
     print("=" * 70)
-
-    # 检查cookies
-    if not os.path.exists("jd_cookies.pkl"):
-        print("\n⚠️  未找到登录凭据！")
-        print("请先运行以下命令完成首次登录：")
-        print("  python3 jd_crawler_via_search.py")
-        return
 
     # 文件路径
     input_file = "Product URL List.xlsx"
@@ -77,25 +74,23 @@ def main():
     crawler = JDCrawlerViaSearch(headless=False)
 
     try:
-        # 登录
-        print("使用保存的cookies登录...")
+        # 登录（会自动处理 cookies 失效的情况）
         crawler.login()
 
         if not crawler.is_logged_in:
-            print("\n✗ 登录失败，cookies可能已过期")
-            print("请运行 python3 jd_crawler_via_search.py 重新登录")
+            print("\n✗ 登录失败")
             return
 
         print("✓ 登录成功！")
 
-        # 记录当前时间
-        runtime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # 记录批次开始时间
+        batch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # 开始爬取
         results = []
         success_count = 0
         failed_count = 0
-        partial_count = 0  # 只获取到一个价格
+        unavailable_count = 0  # 已下架的商品
 
         print("\n" + "=" * 70)
         print("开始爬取价格")
@@ -114,8 +109,10 @@ def main():
             match = re.search(r'/(\d+)\.html', url)
             if not match:
                 print(f"  ✗ 无法提取商品ID\n")
+                crawl_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 results.append({
-                    'Runtime': runtime,
+                    'Batch Time': batch_time,
+                    'Crawl Time': crawl_time,
                     'URL': url,
                     'Price': 'N/A',
                     'Promotion Price': 'N/A'
@@ -169,23 +166,45 @@ def main():
                     original = prices.get('original')
                     promo = prices.get('promo')
 
-                    # 显示结果
+                    # 检查商品是否下架
+                    if original == 'unavailable' and promo == 'unavailable':
+                        print(f"  ⚠️  商品已下架")
+                        crawl_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        results.append({
+                            'Batch Time': batch_time,
+                            'Crawl Time': crawl_time,
+                            'URL': url,
+                            'Price': 'Unavailable',
+                            'Promotion Price': 'Unavailable'
+                        })
+                        unavailable_count += 1
+                        continue
+
+                    # 安全检查：确保至少有一个价格，且两个字段都有值
+                    # 商品一定有常规价格，可能没有促销价
                     if original and promo:
+                        # 最理想的情况：两个价格都有
                         print(f"  ✓ 原价: ¥{original}, 促销价: ¥{promo}")
                         success_count += 1
-                    elif original or promo:
-                        if original:
-                            print(f"  ⚠️  只找到原价: ¥{original}")
-                        if promo:
-                            print(f"  ⚠️  只找到促销价: ¥{promo}")
-                        partial_count += 1
+                    elif original and not promo:
+                        # 只有原价，说明无促销，两个字段写相同价格
+                        print(f"  ✓ 原价: ¥{original} (无促销)")
+                        promo = original
+                        success_count += 1
+                    elif promo and not original:
+                        # 只找到促销价，实际上这应该是常规价格
+                        print(f"  ✓ 价格: ¥{promo} (作为原价和促销价)")
+                        original = promo
+                        success_count += 1
                     else:
                         print(f"  ✗ 未找到价格")
                         failed_count += 1
 
-                    # 保存结果
+                    # 保存结果（现在 original 和 promo 要么都有值，要么都是 None）
+                    crawl_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     results.append({
-                        'Runtime': runtime,
+                        'Batch Time': batch_time,
+                        'Crawl Time': crawl_time,
                         'URL': url,
                         'Price': original if original else 'N/A',
                         'Promotion Price': promo if promo else 'N/A'
@@ -193,8 +212,10 @@ def main():
                 else:
                     print(f"  ✗ 获取失败")
                     failed_count += 1
+                    crawl_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     results.append({
-                        'Runtime': runtime,
+                        'Batch Time': batch_time,
+                        'Crawl Time': crawl_time,
                         'URL': url,
                         'Price': 'N/A',
                         'Promotion Price': 'N/A'
@@ -203,8 +224,10 @@ def main():
             except Exception as e:
                 print(f"  ✗ 错误: {e}")
                 failed_count += 1
+                crawl_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 results.append({
-                    'Runtime': runtime,
+                    'Batch Time': batch_time,
+                    'Crawl Time': crawl_time,
                     'URL': url,
                     'Price': 'N/A',
                     'Promotion Price': 'N/A'
@@ -220,13 +243,14 @@ def main():
         print("\n" + "=" * 70)
         print("爬取完成！")
         print("=" * 70)
-        print(f"  完全成功（两个价格都获取）: {success_count}")
-        print(f"  部分成功（只获取一个价格）: {partial_count}")
+        print(f"  成功: {success_count}")
+        print(f"  已下架: {unavailable_count}")
         print(f"  失败: {failed_count}")
         print(f"  总计: {len(urls)}")
         if len(urls) > 0:
-            total_success = success_count + partial_count
-            print(f"  有效率: {total_success/len(urls)*100:.1f}%")
+            print(f"  成功率: {success_count/len(urls)*100:.1f}%")
+            if unavailable_count > 0:
+                print(f"  下架率: {unavailable_count/len(urls)*100:.1f}%")
 
         # 保存结果
         print(f"\n正在保存结果到 {output_file}...")
@@ -296,10 +320,11 @@ def main():
 
             # 显示Excel列格式
             print("\nExcel 列格式:")
-            print("  1. Runtime - 运行时间")
-            print("  2. URL - 商品链接")
-            print("  3. Price - 原价")
-            print("  4. Promotion Price - 促销价")
+            print("  1. Batch Time - 批次开始时间")
+            print("  2. Crawl Time - 商品爬取完成时间")
+            print("  3. URL - 商品链接")
+            print("  4. Price - 原价")
+            print("  5. Promotion Price - 促销价")
 
         except Exception as e:
             print(f"✗ 保存失败: {str(e)}")
