@@ -279,7 +279,8 @@ class JDCrawlerViaSearch:
                         // 排除明显不是商品价格的元素
                         // 注意：不能用单字"日"，会误杀"日常价"
                         var skipKeywords = ['积分', '优惠券', '满减', '津贴', '红包', '库存', '评价', '已购', '运费', '邮费',
-                                          '月日', '时:', '分:', '点:', '前付', 'mAh', 'MAH', '毫安', '容量', '送达'];
+                                          '月日', '时:', '分:', '点:', '前付', 'mAh', 'MAH', '毫安', '容量', '送达',
+                                          '功率', 'W大', 'W快', 'W闪', '颜色', '版本', '规格'];
                         var shouldSkip = false;
 
                         // 检查是否包含日期时间格式（如"12月11日"、"19:30"）
@@ -403,11 +404,22 @@ class JDCrawlerViaSearch:
 
                 # 特殊情况：如果已有促销价但无原价，找比促销价大的候选
                 if prices['promo'] and not prices['original']:
-                    larger_prices = [p for p in sorted_prices if p > prices['promo']]
-                    if larger_prices:
-                        # 选择比促销价大的最小值作为原价
-                        prices['original'] = min(larger_prices)
-                        print(f"  找到原价: ¥{prices['original']} (比促销价大的最小值)")
+                    # 先尝试找有删除线或明确标注的原价
+                    larger_items = [item for item in all_prices if item['price'] > prices['promo']]
+
+                    # 优先选择有删除线的
+                    del_items = [item for item in larger_items if item.get('isDel', False)]
+                    if del_items:
+                        # 如果有多个删除线价格，选择最大的
+                        del_items.sort(key=lambda x: x['price'], reverse=True)
+                        prices['original'] = del_items[0]['price']
+                        print(f"  找到原价: ¥{prices['original']} (删除线标注)")
+                    else:
+                        # 没有删除线，选择比促销价大的最大值（原价通常是最高的）
+                        larger_prices = [item['price'] for item in larger_items]
+                        if larger_prices:
+                            prices['original'] = max(larger_prices)
+                            print(f"  找到原价: ¥{prices['original']} (比促销价大的最大值)")
                 # 特殊情况：如果已有原价但无促销价，找比原价小的候选
                 elif prices['original'] and not prices['promo']:
                     smaller_prices = [p for p in sorted_prices if p < prices['original'] and p > 20]
