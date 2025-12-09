@@ -273,6 +273,49 @@ def main():
                 if 'Marks' in wb.sheetnames:
                     ws = wb['Marks']
 
+                    # 检查是否需要迁移旧格式（Runtime → Batch Time + Crawl Time）
+                    header_row = [cell.value for cell in ws[1]]
+
+                    if 'Runtime' in header_row and 'Batch Time' not in header_row:
+                        print(f"  检测到旧格式 (Runtime 列)，自动迁移...")
+
+                        # 找到 Runtime 列的位置
+                        runtime_col_idx = header_row.index('Runtime') + 1  # openpyxl 从1开始
+
+                        # 1. 将 "Runtime" 改为 "Batch Time"
+                        ws.cell(row=1, column=runtime_col_idx, value='Batch Time')
+                        print(f"    ✓ 'Runtime' → 'Batch Time'")
+
+                        # 2. 在 Batch Time 右边插入新列 "Crawl Time"
+                        ws.insert_cols(runtime_col_idx + 1)
+                        ws.cell(row=1, column=runtime_col_idx + 1, value='Crawl Time')
+                        print(f"    ✓ 插入 'Crawl Time' 列")
+
+                        # 3. 复制 Batch Time 的值到 Crawl Time（旧数据没有分开记录）
+                        for row_idx in range(2, ws.max_row + 1):
+                            batch_time_value = ws.cell(row=row_idx, column=runtime_col_idx).value
+                            ws.cell(row=row_idx, column=runtime_col_idx + 1, value=batch_time_value)
+                        print(f"    ✓ 已填充 {ws.max_row - 1} 行数据的 Crawl Time")
+
+                        # 4. 如果有 Table，更新其范围（多了一列）
+                        if ws.tables:
+                            table_name = list(ws.tables.keys())[0]
+                            table = ws.tables[table_name]
+                            # 获取新的列数
+                            from openpyxl.utils import get_column_letter
+                            new_col_count = len(header_row) + 1  # 多了一列
+                            new_ref = f"A1:{get_column_letter(new_col_count)}{ws.max_row}"
+                            table.ref = new_ref
+                            print(f"    ✓ 更新 Table 范围: {new_ref}")
+
+                        # 5. 保存迁移后的文件
+                        wb.save(output_file)
+                        print(f"  ✓ 列格式迁移完成！")
+
+                        # 重新加载工作簿（确保后续操作使用更新后的结构）
+                        wb = load_workbook(output_file)
+                        ws = wb['Marks']
+
                     # 找到表格（如果存在）
                     table = None
                     if ws.tables:

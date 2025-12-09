@@ -9,6 +9,7 @@
 - 记录批次开始时间（Batch Time）
 - 记录每个商品爬取完成时间（Crawl Time）
 - 方便分析单个商品的爬取耗时和批次执行进度
+- **自动迁移旧格式**：检测到旧的 Excel 文件时自动升级列结构
 
 **Excel 列结构变化**：
 ```
@@ -32,9 +33,20 @@
 - **耗时分析**：计算 Crawl Time 之间的差值，分析单个商品爬取耗时
 - **故障排查**：查看某个时间点发生了什么
 
+**自动迁移功能**：
+程序会自动检测旧格式的 Excel 文件并升级：
+1. 检测到 "Runtime" 列且没有 "Batch Time" 列
+2. 自动执行迁移：
+   - 将 "Runtime" 重命名为 "Batch Time"
+   - 插入新列 "Crawl Time"
+   - 复制现有数据填充 Crawl Time
+   - 更新 Excel Table 范围
+3. 用户无需手动修改现有文件
+
 **代码改动**：
 - `main_batch.py:87` - 重命名 `runtime` 为 `batch_time`
 - `main_batch.py:112,172,204,215,227` - 所有 `results.append()` 前添加 `crawl_time` 记录
+- `main_batch.py:276-317` - 添加自动迁移逻辑
 - `main_batch.py:323-327` - 更新 Excel 列格式说明
 
 **效果演示**：
