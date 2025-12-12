@@ -349,12 +349,16 @@ class JDCrawlerViaSearch:
 
             print(f"  找到 {len(all_prices)} 个价格候选")
 
-            # 调试：显示所有候选价格
+            # 调试：显示所有候选价格（含详细信息）
             if len(all_prices) <= 15:
-                for item in all_prices:
+                for idx, item in enumerate(all_prices, 1):
                     context_preview = item['context'][:50] if len(item['context']) > 50 else item['context']
                     del_mark = " [删除线]" if item.get('isDel', False) else ""
-                    print(f"    候选: ¥{item['price']}{del_mark} - {context_preview}")
+                    tag = item.get('tagName', '')
+                    cls = item.get('className', '')
+                    print(f"    候选{idx}: ¥{item['price']}{del_mark}")
+                    print(f"           标签:{tag} 类:{cls}")
+                    print(f"           上下文: {context_preview}")
 
             # 去重：相同价格优先保留有明确标注的（删除线、关键词等）
             unique_prices = {}
