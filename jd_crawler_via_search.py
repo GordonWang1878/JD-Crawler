@@ -240,29 +240,22 @@ class JDCrawlerViaSearch:
             js_script = """
             var results = [];
 
-            // 方案A：先定位价格容器，只在容器内搜索
-            // 尝试找到京东商品页的价格区域容器
-            var priceContainer = document.querySelector('.itemInfo-wrap') ||  // 商品信息区域
-                                 document.querySelector('.product-intro') ||   // 产品介绍
-                                 document.querySelector('#choose') ||          // 选择区域
-                                 document.querySelector('#detail') ||          // 详情区域
-                                 document.body;  // fallback到整个页面
-
-            console.log('价格容器:', priceContainer.className || priceContainer.id || 'body');
-
-            // 只在价格容器内搜索这些选择器
+            // 新方案：使用超精确的选择器，只抓商品主价格
+            // 不用通用的.price/.dd（会抓到附加服务、保险等）
             var priceSelectors = [
-                '.p-price',           // 价格区域
-                '.price',             // 价格元素
-                '#summary-price',     // 价格汇总
-                '.dd',                // 详情
-                'del',                // 删除线原价
+                '.p-price .price',              // 主价格区域内的价格
+                '.p-price del',                 // 主价格区域内的删除线
+                '#summary-price .price',        // 价格汇总内的价格
+                '#summary-price del',           // 价格汇总内的删除线
+                '.summary-price .price',        // 价格摘要内的价格
+                '.summary-price del',           // 价格摘要内的删除线
+                '.p-price',                     // 价格区域本身
+                // 不再使用通用的 .price, .dd, del
             ];
 
             var allPriceElements = [];
             for (var s = 0; s < priceSelectors.length; s++) {
-                // 只在容器内查找
-                var elems = priceContainer.querySelectorAll(priceSelectors[s]);
+                var elems = document.querySelectorAll(priceSelectors[s]);
                 for (var e = 0; e < elems.length; e++) {
                     allPriceElements.push(elems[e]);
                 }
