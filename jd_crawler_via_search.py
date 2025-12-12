@@ -242,6 +242,7 @@ class JDCrawlerViaSearch:
 
             // 新方案：使用超精确的选择器，只抓商品主价格
             // 不用通用的.price/.dd（会抓到附加服务、保险等）
+            // 不用容器本身（如.p-price），只用子元素
             var priceSelectors = [
                 '.p-price .price',              // 主价格区域内的价格
                 '.p-price del',                 // 主价格区域内的删除线
@@ -249,8 +250,7 @@ class JDCrawlerViaSearch:
                 '#summary-price del',           // 价格汇总内的删除线
                 '.summary-price .price',        // 价格摘要内的价格
                 '.summary-price del',           // 价格摘要内的删除线
-                '.p-price',                     // 价格区域本身
-                // 不再使用通用的 .price, .dd, del
+                // 移除容器本身（.p-price），避免重复抓取
             ];
 
             var allPriceElements = [];
