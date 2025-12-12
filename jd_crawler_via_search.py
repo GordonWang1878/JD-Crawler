@@ -240,18 +240,29 @@ class JDCrawlerViaSearch:
             js_script = """
             var results = [];
 
-            // 京东的价格通常在这些特定区域
+            // 方案A：先定位价格容器，只在容器内搜索
+            // 尝试找到京东商品页的价格区域容器
+            var priceContainer = document.querySelector('.itemInfo-wrap') ||  // 商品信息区域
+                                 document.querySelector('.product-intro') ||   // 产品介绍
+                                 document.querySelector('#choose') ||          // 选择区域
+                                 document.querySelector('#detail') ||          // 详情区域
+                                 document.body;  // fallback到整个页面
+
+            console.log('价格容器:', priceContainer.className || priceContainer.id || 'body');
+
+            // 只在价格容器内搜索这些选择器
             var priceSelectors = [
                 '.p-price',           // 价格区域
                 '.price',             // 价格元素
                 '#summary-price',     // 价格汇总
-                '.dd',                // 价格详情
+                '.dd',                // 详情
                 'del',                // 删除线原价
             ];
 
             var allPriceElements = [];
             for (var s = 0; s < priceSelectors.length; s++) {
-                var elems = document.querySelectorAll(priceSelectors[s]);
+                // 只在容器内查找
+                var elems = priceContainer.querySelectorAll(priceSelectors[s]);
                 for (var e = 0; e < elems.length; e++) {
                     allPriceElements.push(elems[e]);
                 }
