@@ -167,19 +167,25 @@ class JDCrawlerViaSearch:
 
             print(f"  直接访问商品页...")
             self.driver.get(product_url)
-            time.sleep(3)  # 等待页面加载（优化后：4s→3s）
+            time.sleep(2.5)  # 等待页面加载（优化后：4s→3s→2.5s）
 
-            # 检查当前URL
+            # 检查当前URL - 精确区分不同的失败类型
             current_url = self.driver.current_url
 
-            # 检查是否被重定向到403错误页（更精确的判断）
-            # 只有在明确是403错误页时才返回，而不是URL包含"403"就返回
+            # 1. 检查是否触发反爬验证（需要重试）
+            if "risk_handler" in current_url or "verify" in current_url.lower():
+                print(f"  ⚠️  触发反爬验证页面 (可重试)")
+                return {'original': 'blocked', 'promo': 'blocked'}
+
+            # 2. 检查是否被重定向到403错误页（反爬拦截）
             if "error" in current_url.lower() and "403" in current_url:
-                print(f"  ⚠️  被重定向到403错误页")
-                return None
-            elif current_url.startswith("https://www.jd.com/?") or current_url == "https://www.jd.com/":
-                print(f"  ⚠️  被重定向到首页")
-                return None
+                print(f"  ⚠️  403错误 - 反爬拦截 (可重试)")
+                return {'original': 'forbidden', 'promo': 'forbidden'}
+
+            # 3. 检查是否被重定向到首页（商品不存在）
+            if current_url.startswith("https://www.jd.com/?") or current_url == "https://www.jd.com/":
+                print(f"  ⚠️  被重定向到首页 - 商品不存在")
+                return {'original': 'not_found', 'promo': 'not_found'}
 
             # 检查商品是否已下架
             page_text = self.driver.page_source
@@ -229,7 +235,7 @@ class JDCrawlerViaSearch:
             字典格式: {'original': float, 'promo': float} 或 None
         """
         try:
-            time.sleep(1.5)  # 等待价格加载（优化后：2s→1.5s）
+            time.sleep(1.0)  # 等待价格加载（优化后：2s→1.5s→1s）
 
             prices = {
                 'original': None,

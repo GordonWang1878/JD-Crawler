@@ -85,25 +85,28 @@ def main():
 
         # 记录批次开始时间
         batch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        batch_start_timestamp = time.time()
 
         # 开始爬取
         results = []
         success_count = 0
         failed_count = 0
         unavailable_count = 0  # 已下架的商品
+        total_item_time = 0  # 累计处理时间
 
         print("\n" + "=" * 70)
         print("开始爬取价格")
         print("=" * 70 + "\n")
 
         for idx, url in enumerate(urls, 1):
+            item_start_time = time.time()
             print(f"[{idx}/{len(urls)}] {url}")
 
             # 定期重启浏览器（每50个商品），避免内存泄漏
             if idx > 1 and (idx - 1) % 50 == 0:
                 print(f"\n  🔄 已完成 {idx-1} 个商品，重启浏览器释放内存...\n")
                 crawler.restart_browser()
-                time.sleep(2)  # 优化后：3s → 2s
+                time.sleep(1.5)  # 优化后：3s → 2s → 1.5s
 
             # 提取商品ID
             match = re.search(r'/(\d+)\.html', url)
@@ -135,7 +138,7 @@ def main():
                         if not crawler.restart_browser():
                             print(f"  ✗ 浏览器重启失败")
                             break
-                        time.sleep(1.5)  # 优化后：2s → 1.5s
+                        time.sleep(1.0)  # 优化后：2s → 1.5s → 1s
 
                     prices = crawler.get_price_via_search(product_id)
                     break  # 成功则退出重试循环
@@ -147,7 +150,7 @@ def main():
                         if retry_count <= max_retries:
                             print(f"  ⚠️  会话失效，第 {retry_count} 次重试...")
                             if crawler.restart_browser():
-                                time.sleep(1.5)  # 优化后：2s → 1.5s
+                                time.sleep(1.0)  # 优化后：2s → 1.5s → 1s
                                 continue
                             else:
                                 print(f"  ✗ 浏览器重启失败")
@@ -180,6 +183,48 @@ def main():
                         unavailable_count += 1
                         continue
 
+                    # 检查商品是否不存在（真实无法访问）
+                    if original == 'not_found' and promo == 'not_found':
+                        print(f"  ⚠️  商品不存在")
+                        crawl_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        results.append({
+                            'Batch Time': batch_time,
+                            'Crawl Time': crawl_time,
+                            'URL': url,
+                            'Price': 'Not Found',
+                            'Promotion Price': 'Not Found'
+                        })
+                        unavailable_count += 1
+                        continue
+
+                    # 检查是否触发反爬验证（可重试）
+                    if original == 'blocked' and promo == 'blocked':
+                        print(f"  ⚠️  触发反爬验证 (建议重试)")
+                        crawl_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        results.append({
+                            'Batch Time': batch_time,
+                            'Crawl Time': crawl_time,
+                            'URL': url,
+                            'Price': 'Blocked (Retry)',
+                            'Promotion Price': 'Blocked (Retry)'
+                        })
+                        failed_count += 1
+                        continue
+
+                    # 检查是否403禁止访问（反爬拦截，可重试）
+                    if original == 'forbidden' and promo == 'forbidden':
+                        print(f"  ⚠️  403禁止访问 (建议重试)")
+                        crawl_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        results.append({
+                            'Batch Time': batch_time,
+                            'Crawl Time': crawl_time,
+                            'URL': url,
+                            'Price': 'Forbidden (Retry)',
+                            'Promotion Price': 'Forbidden (Retry)'
+                        })
+                        failed_count += 1
+                        continue
+
                     # 安全检查：确保至少有一个价格，且两个字段都有值
                     # 商品一定有常规价格，可能没有促销价
                     if original and promo:
@@ -197,7 +242,7 @@ def main():
                         original = promo
                         success_count += 1
                     else:
-                        print(f"  ✗ 未找到价格")
+                        print(f"  ✗ 未找到价格 (可重试)")
                         failed_count += 1
 
                     # 保存结果（现在 original 和 promo 要么都有值，要么都是 None）
@@ -206,40 +251,59 @@ def main():
                         'Batch Time': batch_time,
                         'Crawl Time': crawl_time,
                         'URL': url,
-                        'Price': original if original else 'N/A',
-                        'Promotion Price': promo if promo else 'N/A'
+                        'Price': original if original else 'N/A (Retry)',
+                        'Promotion Price': promo if promo else 'N/A (Retry)'
                     })
                 else:
-                    print(f"  ✗ 获取失败")
+                    print(f"  ✗ 获取失败 (可重试)")
                     failed_count += 1
                     crawl_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     results.append({
                         'Batch Time': batch_time,
                         'Crawl Time': crawl_time,
                         'URL': url,
-                        'Price': 'N/A',
-                        'Promotion Price': 'N/A'
+                        'Price': 'N/A (Retry)',
+                        'Promotion Price': 'N/A (Retry)'
                     })
 
             except Exception as e:
-                print(f"  ✗ 错误: {e}")
+                print(f"  ✗ 错误: {e} (可重试)")
                 failed_count += 1
                 crawl_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 results.append({
                     'Batch Time': batch_time,
                     'Crawl Time': crawl_time,
                     'URL': url,
-                    'Price': 'N/A',
-                    'Promotion Price': 'N/A'
+                    'Price': 'N/A (Retry)',
+                    'Promotion Price': 'N/A (Retry)'
                 })
+
+            # 计算和显示时间信息
+            item_elapsed = time.time() - item_start_time
+            total_item_time += item_elapsed
+            avg_time_per_item = total_item_time / idx
+            remaining_items = len(urls) - idx
+            estimated_remaining_time = avg_time_per_item * remaining_items
+
+            print(f"  ⏱️  本商品用时: {item_elapsed:.1f}秒 | 平均: {avg_time_per_item:.1f}秒/商品", end="")
+            if remaining_items > 0:
+                minutes = int(estimated_remaining_time // 60)
+                seconds = int(estimated_remaining_time % 60)
+                print(f" | 预计剩余: {minutes}分{seconds}秒")
+            else:
+                print()
 
             # 添加延迟
             if idx < len(urls):
-                delay = random.uniform(2, 3)  # 优化后：3-5s → 2-3s
+                delay = random.uniform(1.5, 2.5)  # 优化后：3-5s → 2-3s → 1.5-2.5s
                 print(f"  等待 {delay:.1f} 秒...\n")
                 time.sleep(delay)
 
         # 显示统计
+        total_elapsed = time.time() - batch_start_timestamp
+        total_minutes = int(total_elapsed // 60)
+        total_seconds = int(total_elapsed % 60)
+
         print("\n" + "=" * 70)
         print("爬取完成！")
         print("=" * 70)
@@ -251,6 +315,10 @@ def main():
             print(f"  成功率: {success_count/len(urls)*100:.1f}%")
             if unavailable_count > 0:
                 print(f"  下架率: {unavailable_count/len(urls)*100:.1f}%")
+        print(f"\n  ⏱️  总用时: {total_minutes}分{total_seconds}秒")
+        if len(urls) > 0:
+            avg_per_item = total_elapsed / len(urls)
+            print(f"  平均: {avg_per_item:.1f}秒/商品")
 
         # 保存结果
         print(f"\n正在保存结果到 {output_file}...")

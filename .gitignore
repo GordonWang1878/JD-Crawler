@@ -37,9 +37,10 @@ debug_*.py
 inspect_*.py
 find_*.py
 *_test.py
+retry_*.py
 test_page.html
 page_*.html
-screenshot_*.png
+*screenshot*.png
 *.log
 
 # Excel输出文件（数据文件，不提交到git）
