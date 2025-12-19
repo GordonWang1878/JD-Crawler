@@ -52,6 +52,8 @@ Price_Marks_test.xlsx
 uploads/
 crawler_history.db
 instance/
+outputs/
+*_backup.py
 
 # 临时文件
 *.tmp
