@@ -116,24 +116,38 @@ class JDCrawlerViaSearch:
                 self.driver.get("https://passport.jd.com/new/login.aspx")
                 time.sleep(2)
 
-            # 等待用户登录
-            input(">>> 登录完成后按 Enter 继续...")
+            # 自动检测登录状态（每5秒检查一次，最多等待3分钟）
+            print(">>> 等待登录... (最多等待3分钟)")
+            max_wait = 180  # 3分钟
+            check_interval = 5  # 每5秒检查一次
+            waited = 0
 
-            # 验证登录状态
-            self.driver.get("https://order.jd.com/center/list.action")
-            time.sleep(3)
+            while waited < max_wait:
+                time.sleep(check_interval)
+                waited += check_interval
 
-            if "登录" not in self.driver.title and "login" not in self.driver.current_url.lower():
-                print("\n✓ 登录成功！")
-                self.is_logged_in = True
+                # 检查登录状态
+                try:
+                    self.driver.get("https://order.jd.com/center/list.action")
+                    time.sleep(2)
 
-                # 保存 cookies
-                self._save_cookies()
-                print(f"✓ Cookies 已保存到 {self.cookies_file}")
-                print("  下次运行将自动登录\n")
-            else:
-                print("\n✗ 登录失败，请重试")
-                self.is_logged_in = False
+                    if "登录" not in self.driver.title and "login" not in self.driver.current_url.lower():
+                        print("\n✓ 登录成功！")
+                        self.is_logged_in = True
+
+                        # 保存 cookies
+                        self._save_cookies()
+                        print(f"✓ Cookies 已保存到 {self.cookies_file}")
+                        print("  下次运行将自动登录\n")
+                        break
+                    else:
+                        print(f">>> 等待登录中... ({waited}/{max_wait}秒)")
+                except Exception as e:
+                    print(f">>> 检测登录状态时出错: {e}")
+                    continue
+
+            if not self.is_logged_in:
+                print(f"\n✗ 登录超时（等待了{max_wait}秒）")
 
         except Exception as e:
             print(f"\n✗ 登录过程出错: {e}")

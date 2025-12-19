@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}设置 - JD价格爬虫系统{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-gear"></i> 设置</h2>
+        <p class="text-muted">配置爬虫参数和系统设置</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-sliders"></i> 爬虫设置
+            </div>
+            <div class="card-body">
+                <form>
+                    <div class="mb-3">
+                        <label class="form-label">延迟范围 (秒)</label>
+                        <div class="row">
+                            <div class="col-6">
+                                <input type="number" class="form-control" value="1.5" step="0.5" min="0">
+                                <small class="text-muted">最小延迟</small>
+                            </div>
+                            <div class="col-6">
+                                <input type="number" class="form-control" value="2.5" step="0.5" min="0">
+                                <small class="text-muted">最大延迟</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">超时时间 (秒)</label>
+                        <input type="number" class="form-control" value="10" min="5" max="60">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">重试次数</label>
+                        <input type="number" class="form-control" value="3" min="0" max="10">
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="default-headless" checked>
+                            <label class="form-check-label" for="default-headless">
+                                默认使用无头模式
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="save-screenshot">
+                            <label class="form-check-label" for="save-screenshot">
+                                保存调试截图
+                            </label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> 保存设置
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-person-check"></i> 登录状态
+            </div>
+            <div class="card-body">
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle"></i> <strong>已登录</strong>
+                    <div class="mt-2">
+                        <small>用户: gordon.wang1878@gmail.com</small><br>
+                        <small>Cookies有效期: 7天</small>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-clockwise"></i> 重新登录
+                    </button>
+                    <button class="btn btn-outline-danger">
+                        <i class="bi bi-trash"></i> 清除Cookies
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="bi bi-database"></i> 数据管理
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">历史记录保留 (天)</label>
+                    <input type="number" class="form-control" value="30" min="1">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">日志保留 (天)</label>
+                    <input type="number" class="form-control" value="7" min="1">
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-warning">
+                        <i class="bi bi-trash"></i> 清理旧数据
+                    </button>
+                    <button class="btn btn-outline-info">
+                        <i class="bi bi-download"></i> 导出所有数据
+                    </button>
+                    <button class="btn btn-outline-danger">
+                        <i class="bi bi-arrow-counterclockwise"></i> 重置所有设置
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> 系统信息
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>版本:</strong> 1.0.0
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Python:</strong> 3.9+
+                    </div>
+                    <div class="col-md-3">
+                        <strong>数据库:</strong> SQLite
+                    </div>
+                    <div class="col-md-3">
+                        <strong>状态:</strong> <span class="badge bg-success">运行中</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -48,6 +48,11 @@ Price Marks.xlsx
 Price_Marks_test.xlsx
 *_backup_*.xlsx
 
+# Web应用相关
+uploads/
+crawler_history.db
+instance/
+
 # 临时文件
 *.tmp
 *.swp

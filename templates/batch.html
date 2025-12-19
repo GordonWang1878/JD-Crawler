@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block title %}批量爬取 - JD价格爬虫系统{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-collection"></i> 批量爬取</h2>
+        <p class="text-muted">上传Excel文件并开始批量爬取商品价格</p>
+    </div>
+</div>
+
+<!-- 步骤1: 上传文件 -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-1-circle"></i> 步骤 1: 上传商品URL列表
+            </div>
+            <div class="card-body">
+                <div id="upload-area" class="upload-area">
+                    <i class="bi bi-cloud-upload"></i>
+                    <h5 class="mt-3">拖拽Excel文件到这里</h5>
+                    <p class="text-muted">或点击选择文件</p>
+                    <input type="file" id="file-input" accept=".xlsx,.xls" style="display: none;">
+                </div>
+                <div id="file-info" class="mt-3" style="display: none;">
+                    <div class="alert alert-info">
+                        <i class="bi bi-file-earmark-excel"></i>
+                        已上传: <strong id="filename">-</strong>
+                        (<span id="url-count">0</span> 个商品)
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 步骤2: 配置参数 -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-2-circle"></i> 步骤 2: 配置爬取参数
+            </div>
+            <div class="card-body">
+                <form id="config-form">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="headless" checked>
+                                <label class="form-check-label" for="headless">
+                                    无头模式 (Headless) - 不显示浏览器窗口
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="auto-retry">
+                                <label class="form-check-label" for="auto-retry">
+                                    自动重试失败项 (最多3次)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 步骤3: 开始爬取 -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-3-circle"></i> 步骤 3: 开始爬取
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2 d-md-flex">
+                    <button id="btn-start" class="btn btn-primary" disabled>
+                        <i class="bi bi-play-circle"></i> 开始批量爬取
+                    </button>
+                    <button id="btn-stop" class="btn btn-danger" style="display: none;">
+                        <i class="bi bi-stop-circle"></i> 停止
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 实时进度 -->
+<div class="row mt-4" id="progress-section" style="display: none;">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-activity"></i> 实时进度
+            </div>
+            <div class="card-body">
+                <!-- 进度条 -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span id="progress-text">进度: 0 / 0</span>
+                        <span id="progress-percent">0%</span>
+                    </div>
+                    <div class="progress">
+                        <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated"
+                             role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- 当前商品 -->
+                <div class="mt-3">
+                    <strong>当前商品:</strong>
+                    <div id="current-url" class="text-muted">-</div>
+                    <div id="current-status" class="mt-1">-</div>
+                </div>
+
+                <!-- 统计信息 -->
+                <div class="row mt-4">
+                    <div class="col-3">
+                        <div class="text-center">
+                            <div class="text-success" style="font-size: 2rem;" id="stat-success">0</div>
+                            <div class="text-muted">成功</div>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="text-center">
+                            <div class="text-danger" style="font-size: 2rem;" id="stat-failed">0</div>
+                            <div class="text-muted">失败</div>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="text-center">
+                            <div class="text-warning" style="font-size: 2rem;" id="stat-unavailable">0</div>
+                            <div class="text-muted">下架</div>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="text-center">
+                            <div class="text-info" style="font-size: 2rem;" id="stat-total">0</div>
+                            <div class="text-muted">已处理</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 实时日志 -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-terminal"></i> 实时日志</span>
+                <button id="btn-clear-log" class="btn btn-sm btn-outline-secondary">清空</button>
+            </div>
+            <div class="card-body">
+                <div class="log-container">
+                    <div id="log-entries"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let uploadedFilePath = null;
+
+// 初始化文件上传
+initFileUpload('upload-area', 'file-input', function(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // 显示上传中
+    document.getElementById('file-info').style.display = 'none';
+    document.getElementById('btn-start').disabled = true;
+
+    fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            uploadedFilePath = data.filepath;
+            document.getElementById('filename').textContent = data.filename;
+            document.getElementById('url-count').textContent = data.url_count;
+            document.getElementById('file-info').style.display = 'block';
+            document.getElementById('btn-start').disabled = false;
+            showNotification('文件上传成功!', 'success');
+        } else {
+            showNotification('上传失败: ' + data.error, 'danger');
+        }
+    })
+    .catch(err => {
+        showNotification('上传失败: ' + err, 'danger');
+    });
+});
+
+// 开始爬取
+document.getElementById('btn-start').addEventListener('click', function() {
+    if (!uploadedFilePath) {
+        showNotification('请先上传文件', 'warning');
+        return;
+    }
+
+    const config = {
+        headless: document.getElementById('headless').checked,
+        auto_retry: document.getElementById('auto-retry').checked
+    };
+
+    apiRequest('/api/crawl/start', 'POST', {
+        filepath: uploadedFilePath,
+        config: config
+    })
+    .then(data => {
+        if (data.success) {
+            document.getElementById('btn-start').style.display = 'none';
+            document.getElementById('btn-stop').style.display = 'block';
+            document.getElementById('progress-section').style.display = 'block';
+            showNotification('爬取已开始', 'success');
+        } else {
+            showNotification('启动失败: ' + data.error, 'danger');
+        }
+    })
+    .catch(err => {
+        showNotification('启动失败: ' + err, 'danger');
+    });
+});
+
+// 停止爬取
+document.getElementById('btn-stop').addEventListener('click', function() {
+    apiRequest('/api/crawl/stop', 'POST')
+    .then(data => {
+        document.getElementById('btn-start').style.display = 'block';
+        document.getElementById('btn-stop').style.display = 'none';
+        showNotification('爬取已停止', 'warning');
+    });
+});
+
+// 清空日志
+document.getElementById('btn-clear-log').addEventListener('click', function() {
+    document.getElementById('log-entries').innerHTML = '';
+});
+</script>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}日志 - JD价格爬虫系统{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-terminal"></i> 实时日志</h2>
+        <p class="text-muted">查看系统运行日志</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-file-earmark-text"></i> 日志输出</span>
+                <div>
+                    <select id="log-level" class="form-select form-select-sm d-inline-block" style="width: auto;">
+                        <option value="all">全部</option>
+                        <option value="INFO">INFO</option>
+                        <option value="WARNING">WARNING</option>
+                        <option value="ERROR">ERROR</option>
+                    </select>
+                    <button id="btn-pause" class="btn btn-sm btn-outline-warning ms-2">
+                        <i class="bi bi-pause"></i> 暂停
+                    </button>
+                    <button id="btn-clear" class="btn btn-sm btn-outline-secondary ms-2">
+                        <i class="bi bi-trash"></i> 清空
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="log-container" style="max-height: 600px;">
+                    <div id="log-entries"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let isPaused = false;
+
+// 加载历史日志
+function loadLogs() {
+    const level = document.getElementById('log-level').value;
+    const url = level === 'all' ? '/api/logs' : `/api/logs?level=${level}`;
+
+    apiRequest(url)
+    .then(data => {
+        const logContainer = document.getElementById('log-entries');
+        logContainer.innerHTML = '';
+        data.logs.forEach(log => {
+            appendLogEntry(log);
+        });
+    });
+}
+
+// 添加日志条目
+function appendLogEntry(data) {
+    if (isPaused) return;
+
+    const logContainer = document.getElementById('log-entries');
+    if (!logContainer) return;
+
+    const logEntry = document.createElement('div');
+    logEntry.className = 'log-entry';
+
+    const levelClass = `log-level-${data.level}`;
+    const timestamp = `<span class="log-timestamp">[${data.timestamp}]</span>`;
+    const level = `<span class="${levelClass}">[${data.level}]</span>`;
+    const message = `<span>${data.message}</span>`;
+
+    logEntry.innerHTML = `${timestamp} ${level} ${message}`;
+    logContainer.insertBefore(logEntry, logContainer.firstChild);
+
+    while (logContainer.children.length > 200) {
+        logContainer.removeChild(logContainer.lastChild);
+    }
+}
+
+// 事件监听
+document.getElementById('log-level').addEventListener('change', loadLogs);
+
+document.getElementById('btn-pause').addEventListener('click', function() {
+    isPaused = !isPaused;
+    this.innerHTML = isPaused ?
+        '<i class="bi bi-play"></i> 继续' :
+        '<i class="bi bi-pause"></i> 暂停';
+    this.classList.toggle('btn-outline-warning');
+    this.classList.toggle('btn-outline-success');
+});
+
+document.getElementById('btn-clear').addEventListener('click', function() {
+    document.getElementById('log-entries').innerHTML = '';
+});
+
+// 重写Socket.IO日志接收，使用新函数名
+socket.on('log', function(data) {
+    appendLogEntry(data);
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadLogs();
+});
+</script>
+{% endblock %}

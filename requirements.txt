@@ -1,0 +1,24 @@
+# Web框架
+Flask==3.0.0
+Flask-SocketIO==5.3.5
+Flask-CORS==4.0.0
+
+# WebSocket支持
+python-socketio==5.11.0
+python-engineio==4.9.0
+eventlet==0.35.0
+
+# 数据库
+Flask-SQLAlchemy==3.1.1
+
+# Excel处理
+openpyxl==3.1.2
+pandas==2.1.4
+
+# 现有爬虫依赖
+selenium==4.16.0
+undetected-chromedriver==3.5.4
+urllib3==2.1.0
+
+# 工具库
+python-dotenv==1.0.0
