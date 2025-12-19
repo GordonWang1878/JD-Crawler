@@ -47,6 +47,7 @@ page_*.html
 Price Marks.xlsx
 Price_Marks_test.xlsx
 *_backup_*.xlsx
+Product URL List*.xlsx
 
 # Web应用相关
 uploads/
