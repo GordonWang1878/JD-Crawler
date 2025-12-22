@@ -175,8 +175,8 @@ def run_crawl_task(input_filepath, output_filepath, config):
         total = len(urls)
         emit_log('INFO', f'共 {total} 个商品')
 
-        # 初始化爬虫（始终使用有头模式，无头模式无法通过反爬虫检测）
-        emit_log('INFO', '初始化浏览器（有头模式）...')
+        # 初始化爬虫
+        emit_log('INFO', '初始化浏览器...')
         crawler = JDCrawlerViaSearch(headless=False)
         crawler_instance = crawler
 

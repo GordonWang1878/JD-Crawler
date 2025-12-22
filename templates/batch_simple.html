@@ -386,12 +386,14 @@
             font-weight: 500;
             line-height: 1;
             margin-bottom: 4px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .stat-value.success { color: var(--md-success); }
         .stat-value.error { color: var(--md-error); }
         .stat-value.warning { color: var(--md-warning); }
         .stat-value.info { color: var(--md-info); }
+        .stat-value.muted { color: var(--md-primary); }
 
         .stat-label {
             font-size: 12px;
@@ -574,7 +576,7 @@
                                 <div class="stat-label">下架</div>
                             </div>
                             <div class="stat-item">
-                                <div id="stat-total" class="stat-value info">0</div>
+                                <div id="stat-total" class="stat-value muted">0</div>
                                 <div class="stat-label">已处理</div>
                             </div>
                         </div>
@@ -709,16 +711,12 @@
 
         // 开始爬取
         document.getElementById('btn-start').addEventListener('click', function() {
-            const config = {
-                headless: false
-            };
-
             fetch('/api/crawl/start', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     filepath: uploadedFilePath,
-                    config: config
+                    config: {}
                 })
             })
             .then(response => response.json())
