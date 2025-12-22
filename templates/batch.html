@@ -1,251 +1,791 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JD价格爬虫 - 批量爬取</title>
 
-{% block title %}批量爬取 - JD价格爬虫系统{% endblock %}
+    <!-- Google Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Google Fonts - Roboto -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap CSS (for grid system only) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-{% block content %}
-<div class="row">
-    <div class="col-12">
-        <h2><i class="bi bi-collection"></i> 批量爬取</h2>
-        <p class="text-muted">上传Excel文件并开始批量爬取商品价格</p>
-    </div>
-</div>
+    <style>
+        /* Material Design 风格 */
+        * {
+            font-family: 'Roboto', 'Noto Sans SC', sans-serif;
+        }
 
-<!-- 步骤1: 上传文件 -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-1-circle"></i> 步骤 1: 上传商品URL列表
-            </div>
-            <div class="card-body">
-                <div id="upload-area" class="upload-area">
-                    <i class="bi bi-cloud-upload"></i>
-                    <h5 class="mt-3">拖拽Excel文件到这里</h5>
-                    <p class="text-muted">或点击选择文件</p>
-                    <input type="file" id="file-input" accept=".xlsx,.xls" style="display: none;">
-                </div>
-                <div id="file-info" class="mt-3" style="display: none;">
-                    <div class="alert alert-info">
-                        <i class="bi bi-file-earmark-excel"></i>
-                        已上传: <strong id="filename">-</strong>
-                        (<span id="url-count">0</span> 个商品)
-                    </div>
-                </div>
-            </div>
+        :root {
+            /* Material Design Color Palette */
+            --md-primary: #455a64;           /* Blue Grey 700 */
+            --md-primary-light: #607d8b;     /* Blue Grey 500 */
+            --md-primary-dark: #37474f;      /* Blue Grey 800 */
+            --md-accent: #00bfa5;            /* Teal A700 */
+            --md-accent-light: #1de9b6;      /* Teal A400 */
+            --md-success: #4caf50;           /* Green 500 */
+            --md-error: #f44336;             /* Red 500 */
+            --md-warning: #ff9800;           /* Orange 500 */
+            --md-info: #2196f3;              /* Blue 500 */
+            --md-bg: #fafafa;                /* Grey 50 */
+            --md-surface: #ffffff;
+            --md-text-primary: rgba(0,0,0,0.87);
+            --md-text-secondary: rgba(0,0,0,0.54);
+            --md-text-disabled: rgba(0,0,0,0.38);
+
+            /* Material Design Elevation Shadows */
+            --md-shadow-1: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+            --md-shadow-2: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+            --md-shadow-3: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+            --md-shadow-4: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
+            --md-shadow-5: 0 19px 38px rgba(0,0,0,0.30), 0 15px 12px rgba(0,0,0,0.22);
+        }
+
+        body {
+            background: var(--md-bg);
+            margin: 0;
+            padding: 16px;
+            color: var(--md-text-primary);
+        }
+
+        .container {
+            max-width: 1400px;
+        }
+
+        /* Material Card */
+        .md-card {
+            background: var(--md-surface);
+            border-radius: 4px;
+            box-shadow: var(--md-shadow-2);
+            margin-bottom: 16px;
+            transition: box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+
+        .md-card:hover {
+            box-shadow: var(--md-shadow-3);
+        }
+
+        .md-card-header {
+            background: #546e7a;  /* Blue Grey 600 - 中等灰蓝 */
+            color: white;
+            padding: 16px 20px;
+            font-size: 16px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            letter-spacing: 0.5px;
+            height: 56px;
+            box-sizing: border-box;
+        }
+
+        .md-card-header.accent {
+            background: #78909c;  /* Blue Grey 400 - 更浅的灰蓝 */
+        }
+
+        .md-card-header.dark {
+            background: #263238;  /* Blue Grey 900 - 与日志容器一样深 */
+        }
+
+        .md-card-header .material-icons {
+            margin-right: 12px;
+            font-size: 20px;
+        }
+
+        .md-card-header.with-action {
+            justify-content: space-between;
+        }
+
+        .md-card-header.with-action > span {
+            display: flex;
+            align-items: center;
+        }
+
+        .md-card-body {
+            padding: 20px;
+        }
+
+        .md-card-body.log-body {
+            padding: 20px 20px 12px 20px;
+        }
+
+        .md-card-body.log-body .log-container {
+            height: calc(100vh - 212px);
+        }
+
+        /* Page Title */
+        .page-title {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .page-title h1 {
+            font-size: 32px;
+            font-weight: 500;
+            color: var(--md-primary);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .page-title h1 .material-icons {
+            font-size: 36px;
+            color: var(--md-accent);
+        }
+
+        .page-title p {
+            color: var(--md-text-secondary);
+            margin: 8px 0 0 0;
+            font-size: 14px;
+        }
+
+        /* Upload Area */
+        .upload-area {
+            border: 2px dashed rgba(0,0,0,0.12);
+            border-radius: 4px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: #fafafa;
+        }
+
+        .upload-area:hover {
+            border-color: var(--md-accent);
+            background: #f5f5f5;
+        }
+
+        .upload-area.dragover {
+            border-color: var(--md-accent);
+            border-style: solid;
+            background: #e0f2f1;
+        }
+
+        .upload-area .material-icons {
+            font-size: 40px;
+            color: var(--md-text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .upload-area h5 {
+            font-size: 16px;
+            font-weight: 400;
+            margin: 0 0 4px 0;
+            color: var(--md-text-primary);
+        }
+
+        .upload-area p {
+            font-size: 14px;
+            color: var(--md-text-secondary);
+            margin: 0;
+        }
+
+        /* Alert */
+        .md-alert {
+            background: #e8f5e9;
+            border-left: 4px solid var(--md-success);
+            padding: 12px 16px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            margin-top: 16px;
+        }
+
+        .md-alert .material-icons {
+            color: var(--md-success);
+            margin-right: 12px;
+            font-size: 20px;
+        }
+
+        .md-alert-text {
+            font-size: 14px;
+            color: rgba(0,0,0,0.87);
+        }
+
+        /* Material Buttons */
+        .md-btn {
+            background: var(--md-primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1.25px;
+            cursor: pointer;
+            box-shadow: var(--md-shadow-2);
+            transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            margin-top: 12px;
+        }
+
+        .md-btn:hover:not(:disabled) {
+            box-shadow: var(--md-shadow-3);
+            background: var(--md-primary-light);
+        }
+
+        .md-btn:active:not(:disabled) {
+            box-shadow: var(--md-shadow-1);
+        }
+
+        .md-btn:disabled {
+            background: rgba(0,0,0,0.12);
+            color: rgba(0,0,0,0.26);
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        .md-btn.primary {
+            background: var(--md-primary);
+        }
+
+        .md-btn.primary:hover:not(:disabled) {
+            background: #546e7a;
+        }
+
+        .md-btn.success {
+            background: var(--md-success);
+        }
+
+        .md-btn.success:hover:not(:disabled) {
+            background: #66bb6a;
+        }
+
+        .md-btn.danger {
+            background: #ef6c00;  /* Orange 800 - 暗橘色 */
+        }
+
+        .md-btn.danger:hover:not(:disabled) {
+            background: #f57c00;  /* Orange 700 - hover时稍浅 */
+        }
+
+        .md-btn.accent {
+            background: var(--md-accent);
+        }
+
+        .md-btn.accent:hover:not(:disabled) {
+            background: var(--md-accent-light);
+        }
+
+        .md-btn .material-icons {
+            font-size: 18px;
+        }
+
+        /* Small button for clear log */
+        .md-btn-small {
+            background: transparent;
+            color: white;
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 4px;
+            padding: 4px 12px;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .md-btn-small:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: white;
+        }
+
+        /* Progress Bar */
+        .md-progress-container {
+            margin-bottom: 16px;
+        }
+
+        .md-progress-text {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: var(--md-text-secondary);
+            font-weight: 500;
+        }
+
+        .md-progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(0,0,0,0.12);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .md-progress-bar-fill {
+            height: 100%;
+            background: var(--md-accent);
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .md-progress-bar-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        /* Current Product */
+        .current-product {
+            margin-bottom: 16px;
+            padding: 12px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+
+        .current-product-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--md-text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .current-product-value {
+            font-size: 14px;
+            color: var(--md-text-primary);
+            font-style: italic;
+        }
+
+        /* Statistics */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 500;
+            line-height: 1;
+            margin-bottom: 4px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-value.success { color: var(--md-success); }
+        .stat-value.error { color: var(--md-error); }
+        .stat-value.warning { color: var(--md-warning); }
+        .stat-value.info { color: var(--md-info); }
+        .stat-value.muted { color: var(--md-primary); }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--md-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Log Container */
+        .log-container {
+            background: #263238;
+            border-radius: 4px;
+            padding: 16px;
+            height: calc(100vh - 300px);
+            overflow-y: auto;
+            font-family: 'Roboto Mono', 'Consolas', monospace;
+        }
+
+        .log-entry {
+            padding: 6px 8px;
+            margin-bottom: 4px;
+            border-radius: 2px;
+            font-size: 13px;
+            line-height: 1.5;
+            transition: background 0.15s;
+        }
+
+        .log-entry:hover {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .log-timestamp {
+            color: #78909c;
+            font-size: 11px;
+            margin-right: 8px;
+        }
+
+        .log-level-INFO {
+            color: #4dd0e1;
+            font-weight: 500;
+            margin-right: 8px;
+        }
+
+        .log-level-WARNING {
+            color: #ffb74d;
+            font-weight: 500;
+            margin-right: 8px;
+        }
+
+        .log-level-ERROR {
+            color: #ef5350;
+            font-weight: 500;
+            margin-right: 8px;
+        }
+
+        .log-message {
+            color: #eceff1;
+        }
+
+        /* Scrollbar */
+        .log-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .log-container::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+        }
+
+        .log-container::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 4px;
+        }
+
+        .log-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .page-title h1 {
+                font-size: 24px;
+            }
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Page Title -->
+        <div class="page-title">
+            <h1>
+                <span class="material-icons">shopping_cart</span>
+                JD价格爬虫
+            </h1>
+            <p>批量获取京东商品价格</p>
         </div>
-    </div>
-</div>
 
-<!-- 步骤2: 配置参数 -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-2-circle"></i> 步骤 2: 配置爬取参数
-            </div>
-            <div class="card-body">
-                <form id="config-form">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="headless" checked>
-                                <label class="form-check-label" for="headless">
-                                    无头模式 (Headless) - 不显示浏览器窗口
-                                </label>
+        <!-- Main Content -->
+        <div class="row">
+            <!-- Left Column -->
+            <div class="col-md-7">
+                <!-- Upload Card -->
+                <div class="md-card">
+                    <div class="md-card-header">
+                        <span class="material-icons">upload_file</span>
+                        上传商品URL列表
+                    </div>
+                    <div class="md-card-body">
+                        <div id="upload-area" class="upload-area">
+                            <div class="material-icons">cloud_upload</div>
+                            <h5>拖拽Excel文件到这里</h5>
+                            <p>或点击选择文件</p>
+                            <input type="file" id="file-input" accept=".xlsx,.xls" style="display: none;">
+                        </div>
+
+                        <div id="file-info" style="display: none;">
+                            <div class="md-alert">
+                                <span class="material-icons">check_circle</span>
+                                <div class="md-alert-text">
+                                    已上传: <strong id="filename">-</strong>
+                                    (<span id="url-count">0</span> 个商品)
+                                </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="auto-retry">
-                                <label class="form-check-label" for="auto-retry">
-                                    自动重试失败项 (最多3次)
-                                </label>
+
+                        <!-- Action Buttons -->
+                        <button id="btn-start" class="md-btn primary" disabled>
+                            <span class="material-icons">play_arrow</span>
+                            开始批量爬取
+                        </button>
+                        <button id="btn-stop" class="md-btn danger" style="display: none;">
+                            <span class="material-icons">stop</span>
+                            停止爬取
+                        </button>
+                        <button id="btn-download" class="md-btn success" style="display: none;">
+                            <span class="material-icons">download</span>
+                            下载结果
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Progress Card -->
+                <div class="md-card" id="progress-section" style="display: none;">
+                    <div class="md-card-header accent">
+                        <span class="material-icons">analytics</span>
+                        实时进度
+                    </div>
+                    <div class="md-card-body">
+                        <!-- Progress Bar -->
+                        <div class="md-progress-container">
+                            <div class="md-progress-text">
+                                <span id="progress-text">进度: 0 / 0</span>
+                                <span id="progress-percent">0%</span>
+                            </div>
+                            <div class="md-progress-bar">
+                                <div id="progress-bar-fill" class="md-progress-bar-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Current Product -->
+                        <div class="current-product">
+                            <div class="current-product-label">当前商品</div>
+                            <div id="current-url" class="current-product-value">等待开始...</div>
+                        </div>
+
+                        <!-- Statistics -->
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div id="stat-success" class="stat-value success">0</div>
+                                <div class="stat-label">成功</div>
+                            </div>
+                            <div class="stat-item">
+                                <div id="stat-failed" class="stat-value error">0</div>
+                                <div class="stat-label">失败</div>
+                            </div>
+                            <div class="stat-item">
+                                <div id="stat-unavailable" class="stat-value warning">0</div>
+                                <div class="stat-label">下架</div>
+                            </div>
+                            <div class="stat-item">
+                                <div id="stat-total" class="stat-value muted">0</div>
+                                <div class="stat-label">已处理</div>
                             </div>
                         </div>
                     </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 步骤3: 开始爬取 -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-3-circle"></i> 步骤 3: 开始爬取
-            </div>
-            <div class="card-body">
-                <div class="d-grid gap-2 d-md-flex">
-                    <button id="btn-start" class="btn btn-primary" disabled>
-                        <i class="bi bi-play-circle"></i> 开始批量爬取
-                    </button>
-                    <button id="btn-stop" class="btn btn-danger" style="display: none;">
-                        <i class="bi bi-stop-circle"></i> 停止
-                    </button>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
 
-<!-- 实时进度 -->
-<div class="row mt-4" id="progress-section" style="display: none;">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-activity"></i> 实时进度
-            </div>
-            <div class="card-body">
-                <!-- 进度条 -->
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between mb-1">
-                        <span id="progress-text">进度: 0 / 0</span>
-                        <span id="progress-percent">0%</span>
+            <!-- Right Column - Log -->
+            <div class="col-md-5">
+                <div class="md-card" style="height: calc(100vh - 120px);">
+                    <div class="md-card-header dark with-action">
+                        <span>
+                            <span class="material-icons">terminal</span>
+                            实时日志
+                        </span>
+                        <button id="btn-clear-log" class="md-btn-small">清空</button>
                     </div>
-                    <div class="progress">
-                        <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated"
-                             role="progressbar" style="width: 0%"></div>
-                    </div>
-                </div>
-
-                <!-- 当前商品 -->
-                <div class="mt-3">
-                    <strong>当前商品:</strong>
-                    <div id="current-url" class="text-muted">-</div>
-                    <div id="current-status" class="mt-1">-</div>
-                </div>
-
-                <!-- 统计信息 -->
-                <div class="row mt-4">
-                    <div class="col-3">
-                        <div class="text-center">
-                            <div class="text-success" style="font-size: 2rem;" id="stat-success">0</div>
-                            <div class="text-muted">成功</div>
-                        </div>
-                    </div>
-                    <div class="col-3">
-                        <div class="text-center">
-                            <div class="text-danger" style="font-size: 2rem;" id="stat-failed">0</div>
-                            <div class="text-muted">失败</div>
-                        </div>
-                    </div>
-                    <div class="col-3">
-                        <div class="text-center">
-                            <div class="text-warning" style="font-size: 2rem;" id="stat-unavailable">0</div>
-                            <div class="text-muted">下架</div>
-                        </div>
-                    </div>
-                    <div class="col-3">
-                        <div class="text-center">
-                            <div class="text-info" style="font-size: 2rem;" id="stat-total">0</div>
-                            <div class="text-muted">已处理</div>
+                    <div class="md-card-body log-body">
+                        <div class="log-container">
+                            <div id="log-entries"></div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- 实时日志 -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-terminal"></i> 实时日志</span>
-                <button id="btn-clear-log" class="btn btn-sm btn-outline-secondary">清空</button>
-            </div>
-            <div class="card-body">
-                <div class="log-container">
-                    <div id="log-entries"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 
-{% block extra_js %}
-<script>
-let uploadedFilePath = null;
+    <script>
+        // Socket.IO连接
+        const socket = io();
+        let uploadedFilePath = null;
+        let outputFileName = null;
 
-// 初始化文件上传
-initFileUpload('upload-area', 'file-input', function(file) {
-    const formData = new FormData();
-    formData.append('file', file);
+        socket.on('connect', function() {
+            console.log('✓ 已连接到服务器');
+        });
 
-    // 显示上传中
-    document.getElementById('file-info').style.display = 'none';
-    document.getElementById('btn-start').disabled = true;
+        // 接收日志
+        socket.on('log', function(data) {
+            appendLog(data);
+        });
 
-    fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            uploadedFilePath = data.filepath;
-            document.getElementById('filename').textContent = data.filename;
-            document.getElementById('url-count').textContent = data.url_count;
-            document.getElementById('file-info').style.display = 'block';
-            document.getElementById('btn-start').disabled = false;
-            showNotification('文件上传成功!', 'success');
-        } else {
-            showNotification('上传失败: ' + data.error, 'danger');
+        // 接收进度
+        socket.on('progress', function(data) {
+            if (data.percent !== undefined) {
+                updateProgress(data.percent, data.current, data.total);
+            }
+            if (data.current_url) {
+                document.getElementById('current-url').textContent = data.current_url;
+            }
+            if (data.statistics) {
+                updateStatistics(data.statistics);
+            }
+        });
+
+        // 爬取完成
+        socket.on('crawl_complete', function(data) {
+            if (data.success) {
+                appendLog({
+                    timestamp: new Date().toLocaleTimeString(),
+                    level: 'INFO',
+                    message: '✓ 爬取完成！点击下载按钮获取结果'
+                });
+                outputFileName = data.output_file;
+                document.getElementById('btn-stop').style.display = 'none';
+                document.getElementById('btn-download').style.display = 'block';
+            } else {
+                appendLog({
+                    timestamp: new Date().toLocaleTimeString(),
+                    level: 'ERROR',
+                    message: '✗ 爬取失败: ' + data.error
+                });
+                document.getElementById('btn-stop').style.display = 'none';
+                document.getElementById('btn-start').style.display = 'block';
+            }
+        });
+
+        // 文件上传
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                uploadFile(e.target.files[0]);
+            }
+        });
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                uploadFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    uploadedFilePath = data.filepath;
+                    document.getElementById('filename').textContent = data.filename;
+                    document.getElementById('url-count').textContent = data.url_count;
+                    document.getElementById('file-info').style.display = 'block';
+                    document.getElementById('btn-start').disabled = false;
+                }
+            })
+            .catch(err => console.error('Upload failed:', err));
         }
-    })
-    .catch(err => {
-        showNotification('上传失败: ' + err, 'danger');
-    });
-});
 
-// 开始爬取
-document.getElementById('btn-start').addEventListener('click', function() {
-    if (!uploadedFilePath) {
-        showNotification('请先上传文件', 'warning');
-        return;
-    }
+        // 开始爬取
+        document.getElementById('btn-start').addEventListener('click', function() {
+            fetch('/api/crawl/start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    filepath: uploadedFilePath,
+                    config: {}
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('btn-start').style.display = 'none';
+                    document.getElementById('btn-stop').style.display = 'block';
+                    document.getElementById('progress-section').style.display = 'block';
+                }
+            });
+        });
 
-    const config = {
-        headless: document.getElementById('headless').checked,
-        auto_retry: document.getElementById('auto-retry').checked
-    };
+        // 停止爬取
+        document.getElementById('btn-stop').addEventListener('click', function() {
+            fetch('/api/crawl/stop', {method: 'POST'})
+            .then(() => {
+                document.getElementById('btn-start').style.display = 'block';
+                document.getElementById('btn-stop').style.display = 'none';
+            });
+        });
 
-    apiRequest('/api/crawl/start', 'POST', {
-        filepath: uploadedFilePath,
-        config: config
-    })
-    .then(data => {
-        if (data.success) {
-            document.getElementById('btn-start').style.display = 'none';
-            document.getElementById('btn-stop').style.display = 'block';
-            document.getElementById('progress-section').style.display = 'block';
-            showNotification('爬取已开始', 'success');
-        } else {
-            showNotification('启动失败: ' + data.error, 'danger');
+        // 下载结果
+        document.getElementById('btn-download').addEventListener('click', function() {
+            if (outputFileName) {
+                window.location.href = `/api/download/${outputFileName}`;
+            }
+        });
+
+        // 清空日志
+        document.getElementById('btn-clear-log').addEventListener('click', function() {
+            document.getElementById('log-entries').innerHTML = '';
+        });
+
+        // 更新进度
+        function updateProgress(percent, current, total) {
+            const progressBar = document.getElementById('progress-bar-fill');
+            progressBar.style.width = percent + '%';
+            document.getElementById('progress-text').textContent = `进度: ${current} / ${total}`;
+            document.getElementById('progress-percent').textContent = percent + '%';
         }
-    })
-    .catch(err => {
-        showNotification('启动失败: ' + err, 'danger');
-    });
-});
 
-// 停止爬取
-document.getElementById('btn-stop').addEventListener('click', function() {
-    apiRequest('/api/crawl/stop', 'POST')
-    .then(data => {
-        document.getElementById('btn-start').style.display = 'block';
-        document.getElementById('btn-stop').style.display = 'none';
-        showNotification('爬取已停止', 'warning');
-    });
-});
+        // 更新统计
+        function updateStatistics(stats) {
+            document.getElementById('stat-success').textContent = stats.success;
+            document.getElementById('stat-failed').textContent = stats.failed;
+            document.getElementById('stat-unavailable').textContent = stats.unavailable;
+            document.getElementById('stat-total').textContent = stats.total;
+        }
 
-// 清空日志
-document.getElementById('btn-clear-log').addEventListener('click', function() {
-    document.getElementById('log-entries').innerHTML = '';
-});
-</script>
-{% endblock %}
+        // 添加日志
+        function appendLog(data) {
+            const logContainer = document.getElementById('log-entries');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+
+            const levelClass = `log-level-${data.level}`;
+            logEntry.innerHTML = `
+                <span class="log-timestamp">[${data.timestamp}]</span>
+                <span class="${levelClass}">[${data.level}]</span>
+                <span class="log-message">${data.message}</span>
+            `;
+
+            logContainer.insertBefore(logEntry, logContainer.firstChild);
+
+            // 限制日志数量
+            while (logContainer.children.length > 200) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+    </script>
+</body>
+</html>

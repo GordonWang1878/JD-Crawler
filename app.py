@@ -1,95 +1,49 @@
 #!/usr/bin/env python3
 """
-JD价格爬虫 - Web前端应用
+JD价格爬虫 - 简化Web前端（无数据库版本）
 """
 import os
-import json
+import re
 import time
 from datetime import datetime
 from threading import Thread
 from flask import Flask, render_template, request, jsonify, send_file
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO
 from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
 import pandas as pd
 from werkzeug.utils import secure_filename
+from jd_crawler_via_search import JDCrawlerViaSearch
 
 # 初始化Flask应用
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'jd-crawler-secret-key-2025'
+app.config['SECRET_KEY'] = 'jd-crawler-simple-2025'
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///crawler_history.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['OUTPUT_FOLDER'] = 'outputs'
 
-# 确保上传目录存在
+# 确保目录存在
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
 
 # 初始化扩展
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
-db = SQLAlchemy(app)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # 全局变量
 crawler_instance = None
-crawling_task = None
 is_crawling = False
-
-# ==================== 数据库模型 ====================
-
-class CrawlBatch(db.Model):
-    """爬取批次记录"""
-    id = db.Column(db.Integer, primary_key=True)
-    batch_time = db.Column(db.String(50), nullable=False)
-    total_count = db.Column(db.Integer, default=0)
-    success_count = db.Column(db.Integer, default=0)
-    failed_count = db.Column(db.Integer, default=0)
-    unavailable_count = db.Column(db.Integer, default=0)
-    duration = db.Column(db.Float, default=0.0)  # 运行时长（秒）
-    status = db.Column(db.String(20), default='running')  # running, completed, stopped
-    created_at = db.Column(db.DateTime, default=datetime.now)
-
-    results = db.relationship('CrawlResult', backref='batch', lazy=True, cascade='all, delete-orphan')
-
-class CrawlResult(db.Model):
-    """单个商品爬取结果"""
-    id = db.Column(db.Integer, primary_key=True)
-    batch_id = db.Column(db.Integer, db.ForeignKey('crawl_batch.id'), nullable=False)
-    url = db.Column(db.String(500), nullable=False)
-    original_price = db.Column(db.String(50))
-    promo_price = db.Column(db.String(50))
-    status = db.Column(db.String(50))  # success, not_found, unavailable, blocked, forbidden, retry
-    crawl_time = db.Column(db.String(50))
-    created_at = db.Column(db.DateTime, default=datetime.now)
-
-class AppLog(db.Model):
-    """应用日志"""
-    id = db.Column(db.Integer, primary_key=True)
-    timestamp = db.Column(db.DateTime, default=datetime.now)
-    level = db.Column(db.String(20))  # INFO, WARNING, ERROR
-    message = db.Column(db.Text)
-
-# 创建数据库表
-with app.app_context():
-    db.create_all()
+current_results = []
+current_batch_file = None
 
 # ==================== 辅助函数 ====================
 
-def log_message(level, message):
-    """记录日志并通过Socket.IO发送到前端"""
+def emit_log(level, message):
+    """发送日志到前端"""
     timestamp = datetime.now().strftime("%H:%M:%S")
-
-    # 保存到数据库
-    log = AppLog(level=level, message=message)
-    db.session.add(log)
-    db.session.commit()
-
-    # 发送到前端
     socketio.emit('log', {
         'timestamp': timestamp,
         'level': level,
         'message': message
     })
-
     print(f"[{timestamp}] [{level}] {message}")
 
 def emit_progress(data):
@@ -100,139 +54,8 @@ def emit_progress(data):
 
 @app.route('/')
 def index():
-    """首页 - 重定向到仪表盘"""
-    return render_template('dashboard.html')
-
-@app.route('/dashboard')
-def dashboard():
-    """仪表盘页面"""
-    return render_template('dashboard.html')
-
-@app.route('/batch')
-def batch():
-    """批量爬取页面"""
+    """首页"""
     return render_template('batch.html')
-
-@app.route('/single')
-def single():
-    """单品测试页面"""
-    return render_template('single.html')
-
-@app.route('/history')
-def history():
-    """历史记录页面"""
-    return render_template('history.html')
-
-@app.route('/logs')
-def logs():
-    """日志页面"""
-    return render_template('logs.html')
-
-@app.route('/settings')
-def settings():
-    """设置页面"""
-    return render_template('settings.html')
-
-# ==================== API端点 ====================
-
-@app.route('/api/stats')
-def api_stats():
-    """获取统计数据"""
-    # 获取今日数据
-    today = datetime.now().date()
-    today_batches = CrawlBatch.query.filter(
-        db.func.date(CrawlBatch.created_at) == today
-    ).all()
-
-    total_success = sum(b.success_count for b in today_batches)
-    total_failed = sum(b.failed_count for b in today_batches)
-    total_unavailable = sum(b.unavailable_count for b in today_batches)
-    total_count = sum(b.total_count for b in today_batches)
-
-    success_rate = (total_success / total_count * 100) if total_count > 0 else 0
-
-    return jsonify({
-        'today_success': total_success,
-        'today_failed': total_failed,
-        'today_unavailable': total_unavailable,
-        'success_rate': round(success_rate, 1),
-        'total_count': total_count
-    })
-
-@app.route('/api/history')
-def api_history():
-    """获取历史记录"""
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
-
-    pagination = CrawlBatch.query.order_by(CrawlBatch.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
-
-    batches = [{
-        'id': b.id,
-        'batch_time': b.batch_time,
-        'total': b.total_count,
-        'success': b.success_count,
-        'failed': b.failed_count,
-        'unavailable': b.unavailable_count,
-        'duration': round(b.duration, 1),
-        'status': b.status,
-        'created_at': b.created_at.strftime("%Y-%m-%d %H:%M:%S")
-    } for b in pagination.items]
-
-    return jsonify({
-        'batches': batches,
-        'total': pagination.total,
-        'pages': pagination.pages,
-        'current_page': page
-    })
-
-@app.route('/api/batch/<int:batch_id>')
-def api_batch_detail(batch_id):
-    """获取批次详情"""
-    batch = CrawlBatch.query.get_or_404(batch_id)
-    results = [{
-        'url': r.url,
-        'original_price': r.original_price,
-        'promo_price': r.promo_price,
-        'status': r.status,
-        'crawl_time': r.crawl_time
-    } for r in batch.results]
-
-    return jsonify({
-        'batch': {
-            'id': batch.id,
-            'batch_time': batch.batch_time,
-            'total': batch.total_count,
-            'success': batch.success_count,
-            'failed': batch.failed_count,
-            'unavailable': batch.unavailable_count,
-            'duration': round(batch.duration, 1),
-            'status': batch.status
-        },
-        'results': results
-    })
-
-@app.route('/api/logs')
-def api_logs():
-    """获取日志"""
-    limit = request.args.get('limit', 100, type=int)
-    level = request.args.get('level', 'all')
-
-    query = AppLog.query
-    if level != 'all':
-        query = query.filter_by(level=level.upper())
-
-    logs = query.order_by(AppLog.timestamp.desc()).limit(limit).all()
-
-    return jsonify({
-        'logs': [{
-            'timestamp': log.timestamp.strftime("%H:%M:%S"),
-            'level': log.level,
-            'message': log.message
-        } for log in logs]
-    })
 
 @app.route('/api/upload', methods=['POST'])
 def api_upload():
@@ -245,7 +68,7 @@ def api_upload():
         return jsonify({'error': 'No file selected'}), 400
 
     if not file.filename.endswith(('.xlsx', '.xls')):
-        return jsonify({'error': 'Invalid file type. Please upload Excel file.'}), 400
+        return jsonify({'error': 'Invalid file type'}), 400
 
     # 保存文件
     filename = secure_filename(file.filename)
@@ -255,7 +78,12 @@ def api_upload():
     # 读取URL数量
     try:
         df = pd.read_excel(filepath)
-        url_count = len(df)
+
+        # 检查是否有ProductKey列
+        if 'ProductKey' in df.columns:
+            url_count = len(df['ProductKey'].dropna())
+        else:
+            url_count = len(df)
 
         return jsonify({
             'success': True,
@@ -269,7 +97,7 @@ def api_upload():
 @app.route('/api/crawl/start', methods=['POST'])
 def api_crawl_start():
     """开始批量爬取"""
-    global is_crawling, crawling_task
+    global is_crawling, current_batch_file
 
     if is_crawling:
         return jsonify({'error': 'Crawler is already running'}), 400
@@ -281,12 +109,21 @@ def api_crawl_start():
     if not filepath or not os.path.exists(filepath):
         return jsonify({'error': 'Invalid file path'}), 400
 
+    # 生成输出文件名
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_filename = f"Price_Marks_{timestamp}.xlsx"
+    current_batch_file = os.path.join(app.config['OUTPUT_FOLDER'], output_filename)
+
     # 启动爬取任务
     is_crawling = True
-    crawling_task = Thread(target=run_crawl_task, args=(filepath, config))
+    crawling_task = Thread(target=run_crawl_task, args=(filepath, current_batch_file, config))
     crawling_task.start()
 
-    return jsonify({'success': True, 'message': 'Crawling started'})
+    return jsonify({
+        'success': True,
+        'message': 'Crawling started',
+        'output_file': output_filename
+    })
 
 @app.route('/api/crawl/stop', methods=['POST'])
 def api_crawl_stop():
@@ -295,216 +132,250 @@ def api_crawl_stop():
     is_crawling = False
     return jsonify({'success': True, 'message': 'Crawling stopped'})
 
-@app.route('/api/test-single', methods=['POST'])
-def api_test_single():
-    """测试单个商品"""
-    data = request.json
-    product_id = data.get('product_id')
-
-    if not product_id:
-        return jsonify({'error': 'Product ID is required'}), 400
-
-    # 这里会集成实际的爬虫代码
-    # 暂时返回模拟数据
-    return jsonify({
-        'success': True,
-        'result': {
-            'product_id': product_id,
-            'status': 'success',
-            'original_price': '102.00',
-            'promo_price': '91.80',
-            'crawl_time': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'response_time': '2.3'
-        }
-    })
+@app.route('/api/download/<filename>')
+def api_download(filename):
+    """下载结果文件"""
+    filepath = os.path.join(app.config['OUTPUT_FOLDER'], filename)
+    if os.path.exists(filepath):
+        return send_file(filepath, as_attachment=True)
+    else:
+        return jsonify({'error': 'File not found'}), 404
 
 # ==================== 爬取任务 ====================
 
-def run_crawl_task(filepath, config):
-    """运行爬取任务（在后台线程中）"""
-    global is_crawling, crawler_instance
+def run_crawl_task(input_filepath, output_filepath, config):
+    """运行爬取任务"""
+    global is_crawling, crawler_instance, current_results
 
-    with app.app_context():
-        try:
-            from jd_crawler_via_search import JDCrawlerViaSearch
-            import re
+    try:
+        emit_log('INFO', '=' * 50)
+        emit_log('INFO', '开始批量爬取')
+        emit_log('INFO', '=' * 50)
 
-            log_message('INFO', '初始化浏览器...')
+        # 读取Excel
+        emit_log('INFO', f'读取文件: {os.path.basename(input_filepath)}')
+        df = pd.read_excel(input_filepath)
 
-            # 读取Excel
-            df = pd.read_excel(filepath)
+        # 智能检测列：优先使用URL列，否则使用ProductKey列
+        if 'ProductUrl std' in df.columns:
+            urls = df['ProductUrl std'].tolist()
+            emit_log('INFO', f'从ProductUrl std列读取URL（共{len(urls)}个）')
+        elif 'ProductKey' in df.columns:
+            product_ids = df['ProductKey'].tolist()
+            urls = [f"https://item.jd.com/{pid}.html" for pid in product_ids]
+            emit_log('INFO', f'从ProductKey列读取商品ID（共{len(urls)}个）')
+        elif 'URL' in df.columns or 'url' in df.columns:
+            col_name = 'URL' if 'URL' in df.columns else 'url'
+            urls = df[col_name].tolist()
+            emit_log('INFO', f'从{col_name}列读取URL（共{len(urls)}个）')
+        else:
+            urls = df.iloc[:, 0].tolist()
+            emit_log('INFO', f'从第一列读取URL（共{len(urls)}个）')
 
-            # 智能检测列：优先使用URL列，否则使用ProductKey列
-            if 'ProductUrl std' in df.columns:
-                urls = df['ProductUrl std'].tolist()
-            elif 'ProductKey' in df.columns:
-                # 如果只有ProductKey，构造完整URL
-                urls = [f"https://item.jd.com/{pk}.html" if not str(pk).startswith('http') else pk
-                       for pk in df['ProductKey'].tolist()]
-            elif 'URL' in df.columns or 'url' in df.columns:
-                col_name = 'URL' if 'URL' in df.columns else 'url'
-                urls = df[col_name].tolist()
-            else:
-                # 兜底：使用第一列
-                urls = df.iloc[:, 0].tolist()
+        total = len(urls)
+        emit_log('INFO', f'共 {total} 个商品')
 
-            total = len(urls)
+        # 初始化爬虫
+        emit_log('INFO', '初始化浏览器...')
+        crawler = JDCrawlerViaSearch(headless=False)
+        crawler_instance = crawler
 
-            # 创建批次记录
-            batch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            batch = CrawlBatch(
-                batch_time=batch_time,
-                total_count=total,
-                status='running'
-            )
-            db.session.add(batch)
-            db.session.commit()
+        # 登录
+        emit_log('INFO', '正在登录...')
+        crawler.login()
 
-            # 初始化爬虫
-            headless = config.get('headless', False)
-            crawler = JDCrawlerViaSearch(headless=headless)
-            crawler_instance = crawler
+        if not crawler.is_logged_in:
+            emit_log('ERROR', '登录失败')
+            is_crawling = False
+            return
 
-            # 登录
-            log_message('INFO', '正在登录...')
-            crawler.login()
+        emit_log('INFO', '✓ 登录成功')
 
-            if not crawler.is_logged_in:
-                log_message('ERROR', '登录失败')
-                batch.status = 'failed'
-                db.session.commit()
-                is_crawling = False
-                return
+        # 准备结果列表
+        results = []
+        success_count = 0
+        failed_count = 0
+        unavailable_count = 0
 
-            log_message('INFO', '✓ 登录成功')
+        batch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        start_time = time.time()
 
-            # 开始爬取
-            results = []
-            success_count = 0
-            failed_count = 0
-            unavailable_count = 0
-            start_time = time.time()
+        # 开始爬取
+        for idx, url in enumerate(urls, 1):
+            if not is_crawling:
+                emit_log('WARNING', '爬取已停止')
+                break
 
-            for idx, url in enumerate(urls, 1):
-                if not is_crawling:
-                    log_message('WARNING', '爬取已停止')
-                    break
+            # 提取商品ID
+            match = re.search(r'/(\d+)\.html', str(url))
+            if not match:
+                emit_log('WARNING', f'[{idx}/{total}] 无法提取商品ID: {url}')
+                continue
 
-                # 提取商品ID
-                match = re.search(r'/(\d+)\.html', str(url))
-                if not match:
-                    log_message('WARNING', f'[{idx}/{total}] 无法提取商品ID: {url}')
-                    continue
+            product_id = match.group(1)
+            emit_log('INFO', f'[{idx}/{total}] 处理: {product_id}')
 
-                product_id = match.group(1)
-                log_message('INFO', f'[{idx}/{total}] 正在处理: {product_id}')
+            # 发送进度
+            emit_progress({
+                'current': idx,
+                'total': total,
+                'percent': round(idx / total * 100, 1),
+                'current_url': url,
+                'product_id': product_id,
+                'status': 'processing'
+            })
 
-                # 发送进度
-                emit_progress({
-                    'current': idx,
-                    'total': total,
-                    'percent': round(idx / total * 100, 1),
-                    'current_url': url,
-                    'product_id': product_id,
-                    'status': 'processing'
-                })
+            try:
+                # 获取价格
+                prices = crawler.get_price_via_search(product_id)
 
-                try:
-                    # 获取价格
-                    prices = crawler.get_price_via_search(product_id)
+                crawl_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                    if prices:
-                        original = prices.get('original')
-                        promo = prices.get('promo')
+                if prices:
+                    original = prices.get('original')
+                    promo = prices.get('promo')
 
-                        # 判断状态
-                        if original == 'not_found':
-                            status = 'not_found'
-                            status_text = 'Not Found'
-                            unavailable_count += 1
-                        elif original == 'blocked':
-                            status = 'blocked'
-                            status_text = 'Blocked (Retry)'
-                            failed_count += 1
-                        elif original == 'forbidden':
-                            status = 'forbidden'
-                            status_text = 'Forbidden (Retry)'
-                            failed_count += 1
-                        elif original == 'unavailable':
-                            status = 'unavailable'
-                            status_text = 'Unavailable'
-                            unavailable_count += 1
-                        else:
-                            status = 'success'
-                            status_text = f'¥{original} / ¥{promo}'
-                            success_count += 1
+                    # 判断状态并保存结果
+                    if original == 'not_found':
+                        emit_log('WARNING', f'  ⚠️  商品不存在')
+                        results.append({
+                            'Batch Time': batch_time,
+                            'Crawl Time': crawl_time,
+                            'URL': url,
+                            'Price': 'Not Found',
+                            'Promotion Price': 'Not Found'
+                        })
+                        unavailable_count += 1
 
-                        log_message('INFO', f'  ✓ {status_text}')
-
-                        # 保存结果
-                        result = CrawlResult(
-                            batch_id=batch.id,
-                            url=url,
-                            original_price=str(original),
-                            promo_price=str(promo),
-                            status=status,
-                            crawl_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        )
-                        db.session.add(result)
-
-                    else:
-                        log_message('WARNING', f'  ✗ 获取失败')
+                    elif original == 'blocked':
+                        emit_log('WARNING', f'  ⚠️  触发反爬验证 (建议重试)')
+                        results.append({
+                            'Batch Time': batch_time,
+                            'Crawl Time': crawl_time,
+                            'URL': url,
+                            'Price': 'Blocked (Retry)',
+                            'Promotion Price': 'Blocked (Retry)'
+                        })
                         failed_count += 1
 
-                        result = CrawlResult(
-                            batch_id=batch.id,
-                            url=url,
-                            original_price='N/A (Retry)',
-                            promo_price='N/A (Retry)',
-                            status='retry',
-                            crawl_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        )
-                        db.session.add(result)
+                    elif original == 'forbidden':
+                        emit_log('WARNING', f'  ⚠️  403禁止访问 (建议重试)')
+                        results.append({
+                            'Batch Time': batch_time,
+                            'Crawl Time': crawl_time,
+                            'URL': url,
+                            'Price': 'Forbidden (Retry)',
+                            'Promotion Price': 'Forbidden (Retry)'
+                        })
+                        failed_count += 1
 
-                    db.session.commit()
+                    elif original == 'unavailable':
+                        emit_log('WARNING', f'  ⚠️  商品已下架')
+                        results.append({
+                            'Batch Time': batch_time,
+                            'Crawl Time': crawl_time,
+                            'URL': url,
+                            'Price': 'Unavailable',
+                            'Promotion Price': 'Unavailable'
+                        })
+                        unavailable_count += 1
 
-                    # 发送统计更新
-                    emit_progress({
-                        'statistics': {
-                            'success': success_count,
-                            'failed': failed_count,
-                            'unavailable': unavailable_count,
-                            'total': idx
-                        }
+                    else:
+                        emit_log('INFO', f'  ✓ 成功: ¥{original} / ¥{promo}')
+                        results.append({
+                            'Batch Time': batch_time,
+                            'Crawl Time': crawl_time,
+                            'URL': url,
+                            'Price': original if original else 'N/A (Retry)',
+                            'Promotion Price': promo if promo else 'N/A (Retry)'
+                        })
+                        if original and promo:
+                            success_count += 1
+                        else:
+                            failed_count += 1
+
+                else:
+                    emit_log('WARNING', f'  ✗ 获取失败 (可重试)')
+                    results.append({
+                        'Batch Time': batch_time,
+                        'Crawl Time': crawl_time,
+                        'URL': url,
+                        'Price': 'N/A (Retry)',
+                        'Promotion Price': 'N/A (Retry)'
                     })
-
-                except Exception as e:
-                    log_message('ERROR', f'  ✗ 错误: {str(e)}')
                     failed_count += 1
 
-                time.sleep(0.5)  # 短暂延迟，避免过快
+                # 发送统计更新
+                emit_progress({
+                    'statistics': {
+                        'success': success_count,
+                        'failed': failed_count,
+                        'unavailable': unavailable_count,
+                        'total': idx
+                    }
+                })
 
-            # 完成
-            duration = time.time() - start_time
-            batch.success_count = success_count
-            batch.failed_count = failed_count
-            batch.unavailable_count = unavailable_count
-            batch.duration = duration
-            batch.status = 'completed' if is_crawling else 'stopped'
-            db.session.commit()
+            except Exception as e:
+                emit_log('ERROR', f'  ✗ 错误: {str(e)}')
+                failed_count += 1
+                results.append({
+                    'Batch Time': batch_time,
+                    'Crawl Time': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'URL': url,
+                    'Price': 'N/A (Retry)',
+                    'Promotion Price': 'N/A (Retry)'
+                })
 
-            log_message('INFO', f'✓ 爬取完成! 成功: {success_count}, 失败: {failed_count}, 下架: {unavailable_count}')
+            # 短暂延迟
+            time.sleep(0.5)
 
-            # 关闭爬虫
-            crawler.close()
-            crawler_instance = None
-            is_crawling = False
+        # 保存Excel
+        emit_log('INFO', '保存结果到Excel...')
+        df_results = pd.DataFrame(results)
+        df_results.to_excel(output_filepath, index=False, engine='openpyxl')
 
-        except Exception as e:
-            log_message('ERROR', f'爬取任务异常: {str(e)}')
-            is_crawling = False
-            if crawler_instance:
-                crawler_instance.close()
+        # 完成
+        duration = time.time() - start_time
+        emit_log('INFO', '=' * 50)
+        emit_log('INFO', f'✓ 爬取完成!')
+        emit_log('INFO', f'  成功: {success_count}')
+        emit_log('INFO', f'  失败: {failed_count}')
+        emit_log('INFO', f'  下架: {unavailable_count}')
+        emit_log('INFO', f'  用时: {duration:.1f}秒')
+        emit_log('INFO', f'  结果文件: {os.path.basename(output_filepath)}')
+        emit_log('INFO', '=' * 50)
+
+        # 发送完成通知
+        socketio.emit('crawl_complete', {
+            'success': True,
+            'output_file': os.path.basename(output_filepath),
+            'stats': {
+                'success': success_count,
+                'failed': failed_count,
+                'unavailable': unavailable_count,
+                'total': len(results),
+                'duration': round(duration, 1)
+            }
+        })
+
+        # 关闭爬虫
+        crawler.close()
+        crawler_instance = None
+        is_crawling = False
+        current_results = results
+
+    except Exception as e:
+        emit_log('ERROR', f'爬取任务异常: {str(e)}')
+        import traceback
+        traceback.print_exc()
+        is_crawling = False
+        if crawler_instance:
+            crawler_instance.close()
+
+        socketio.emit('crawl_complete', {
+            'success': False,
+            'error': str(e)
+        })
 
 # ==================== Socket.IO事件 ====================
 
@@ -512,7 +383,7 @@ def run_crawl_task(filepath, config):
 def handle_connect():
     """客户端连接"""
     print('Client connected')
-    emit('connected', {'data': 'Connected to server'})
+    socketio.emit('connected', {'data': 'Connected to server'})
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -523,9 +394,9 @@ def handle_disconnect():
 
 if __name__ == '__main__':
     print("=" * 70)
-    print("JD价格爬虫 - Web前端 (完整版)")
+    print("JD价格爬虫 - 简化Web前端")
     print("=" * 70)
-    print("\n访问: http://localhost:5002")
+    print("\n访问: http://localhost:5001")
     print("\n按 Ctrl+C 停止服务器\n")
 
-    socketio.run(app, debug=True, host='0.0.0.0', port=5002, allow_unsafe_werkzeug=True)
+    socketio.run(app, debug=True, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
