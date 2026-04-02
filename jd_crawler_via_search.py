@@ -12,11 +12,31 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
+import subprocess
 import time
 import re
 import os
 import pickle
 from typing import Optional
+
+
+def _detect_chrome_version() -> Optional[int]:
+    """自动检测本机 Chrome 主版本号"""
+    paths = [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
+    ]
+    for path in paths:
+        if os.path.exists(path):
+            try:
+                out = subprocess.check_output([path, "--version"], stderr=subprocess.DEVNULL, text=True)
+                match = re.search(r"(\d+)\.", out)
+                if match:
+                    return int(match.group(1))
+            except Exception:
+                continue
+    return None
 
 
 class JDCrawlerViaSearch:
@@ -39,10 +59,11 @@ class JDCrawlerViaSearch:
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--window-size=1920,1080')
 
-            print(f"  正在初始化浏览器...")
+            chrome_version = _detect_chrome_version()
+            print(f"  正在初始化浏览器... (Chrome v{chrome_version or '?'})")
             self.driver = uc.Chrome(
                 options=options,
-                version_main=142,
+                version_main=chrome_version,
                 use_subprocess=False,
             )
             self.driver.implicitly_wait(5)
