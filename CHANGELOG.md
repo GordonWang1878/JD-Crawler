@@ -1,5 +1,41 @@
 # 更新日志
 
+## 2026-04-24 - 价格抓取修复 + 反爬策略 + 前端改版
+
+### 🐛 修复
+
+- **价格抓取完全失效**：京东页面结构升级,旧选择器失效。重写 `_extract_price()` 适配新 DOM:
+  - `.product-price--value` — 当前售价/促销价
+  - `.product-price--gray` — 原价/日常价
+  - `.calculator-product-info .product-price` — fallback
+- **误判商品不存在**:`https://www.jd.com/?d` 明确标记为 `not_found`(终态),其他首页重定向保持 `blocked`(可重试)
+
+### 🛡️ 反爬策略
+
+- **warmup**:登录后访问首页 → 搜索 → 点商品 → 返回,约 30 秒模拟正常浏览
+- **渐进式延迟**:前 10 个 2-4s / 11-20 个 4-7s / 之后 6-10s
+- **连续失败冷却**:2 次连续失败触发 30s/60s/90s(最多 120s)冷却,冷却后访问首页"重置"会话
+- **浏览器会话复用**:批次结束不关闭浏览器,下次直接复用,避免重复下载 ChromeDriver
+- Flask `debug=False`,避免 stat reloader 启动多个进程
+
+### 🎨 前端改版
+
+- **数据预览表** 展示完整 5 列:`#` / 品牌 / Item / URL / Product Key / Price Reference
+- **爬取结果表** 去掉商品 ID,改为 品牌 / Item / URL(URL 可点击打开新标签便于手动复核)
+- Excel 输出同步带上 Brand / Item / Product Key / Price Reference
+
+### 🔧 其他
+
+- Excel 列名归一化 + 前缀 fallback:容忍大小写、空格、下划线、后缀变体(如 `Price Reference_0`、`ProductUrl Std`)
+- 浮点数自动保留 2 位小数,整数不带小数
+- Chrome 版本自动检测(避免 ChromeDriver 版本不匹配)
+
+### 📄 文档
+
+- README 重写:以 Web UI 为主入口,更新安装步骤、Excel 格式、状态语义、反爬说明
+
+---
+
 ## 2025-12-12 - P4 性能优化：进一步减少等待时间 + 实时进度追踪
 
 ### ⚡ 性能优化
