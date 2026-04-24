@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JD 价格爬虫 - 部署与使用指南</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+            line-height: 1.8;
+            color: #1a1a2e;
+            background: #f0f2f5;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #37474f 0%, #455a64 50%, #00897b 100%);
+            color: #fff;
+            padding: 60px 0 50px;
+            text-align: center;
+        }
+        .header h1 { font-size: 2.4rem; font-weight: 700; letter-spacing: 1px; }
+        .header p { margin-top: 12px; font-size: 1.1rem; opacity: 0.85; }
+        .badge {
+            display: inline-block;
+            margin-top: 18px;
+            padding: 5px 16px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+
+        /* Container */
+        .container { max-width: 880px; margin: -30px auto 60px; padding: 0 20px; position: relative; z-index: 1; }
+
+        /* Cards */
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            padding: 36px 40px;
+            margin-bottom: 28px;
+        }
+        .card h2 {
+            font-size: 1.4rem;
+            color: #37474f;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #e0f2f1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .card h2 .step-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 34px; height: 34px;
+            background: #00897b;
+            color: #fff;
+            border-radius: 50%;
+            font-size: 0.95rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .card h3 {
+            font-size: 1.1rem;
+            color: #455a64;
+            margin: 22px 0 10px;
+        }
+
+        /* Code blocks */
+        pre {
+            background: #263238;
+            color: #eeffff;
+            padding: 16px 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: "SF Mono", "Fira Code", Consolas, monospace;
+            font-size: 0.9rem;
+            line-height: 1.7;
+            margin: 12px 0 16px;
+        }
+        code {
+            font-family: "SF Mono", "Fira Code", Consolas, monospace;
+            font-size: 0.88rem;
+        }
+        p code, li code {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 2px 7px;
+            border-radius: 4px;
+        }
+
+        /* Lists */
+        ol, ul { padding-left: 24px; margin: 8px 0; }
+        li { margin: 6px 0; }
+
+        /* Info / Warning boxes */
+        .info-box, .warn-box, .tip-box {
+            padding: 14px 18px;
+            border-radius: 8px;
+            margin: 14px 0;
+            font-size: 0.95rem;
+        }
+        .info-box { background: #e3f2fd; border-left: 4px solid #1e88e5; }
+        .warn-box { background: #fff3e0; border-left: 4px solid #fb8c00; }
+        .tip-box  { background: #e8f5e9; border-left: 4px solid #43a047; }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 14px 0;
+            font-size: 0.92rem;
+        }
+        th, td {
+            padding: 10px 14px;
+            border: 1px solid #e0e0e0;
+            text-align: left;
+        }
+        th { background: #f5f5f5; font-weight: 600; color: #37474f; }
+        tr:nth-child(even) td { background: #fafafa; }
+
+        /* Screenshots placeholder */
+        .screenshot {
+            background: #eceff1;
+            border: 2px dashed #b0bec5;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            color: #78909c;
+            margin: 14px 0;
+            font-size: 0.9rem;
+        }
+
+        /* TOC */
+        .toc {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            padding: 28px 36px;
+            margin-bottom: 28px;
+        }
+        .toc h2 { font-size: 1.2rem; color: #37474f; margin-bottom: 14px; border: none; padding: 0; }
+        .toc ol { padding-left: 20px; }
+        .toc li { margin: 6px 0; }
+        .toc a { color: #00897b; text-decoration: none; }
+        .toc a:hover { text-decoration: underline; }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: #90a4ae;
+            font-size: 0.85rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .card { padding: 24px 20px; }
+            .header h1 { font-size: 1.8rem; }
+            pre { font-size: 0.82rem; padding: 12px 14px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>JD 价格爬虫 - 部署与使用指南</h1>
+    <p>从零开始，在你的电脑上部署和运行京东价格监测工具</p>
+    <span class="badge">适用于 macOS / Windows / Linux</span>
+</div>
+
+<div class="container">
+
+    <!-- 目录 -->
+    <div class="toc">
+        <h2>📑 目录</h2>
+        <ol>
+            <li><a href="#overview">工具简介</a></li>
+            <li><a href="#prerequisites">环境准备</a></li>
+            <li><a href="#download">下载项目代码</a></li>
+            <li><a href="#install">安装 Python 依赖</a></li>
+            <li><a href="#run">启动服务</a></li>
+            <li><a href="#usage">使用方法</a></li>
+            <li><a href="#excel">Excel 文件格式说明</a></li>
+            <li><a href="#output">输出结果说明</a></li>
+            <li><a href="#faq">常见问题排查</a></li>
+            <li><a href="#ai-deploy">使用 AI Coding 智能体一键部署</a></li>
+        </ol>
+    </div>
+
+    <!-- 1. 工具简介 -->
+    <div class="card" id="overview">
+        <h2><span class="step-num">1</span> 工具简介</h2>
+        <p>这是一个<strong>京东商品价格批量监测工具</strong>，主要功能：</p>
+        <ul>
+            <li>从 Excel 文件批量读取京东商品链接</li>
+            <li>自动爬取每个商品的<strong>原价</strong>和<strong>促销价</strong>（到手价 / 补贴价）</li>
+            <li>支持京东账号登录，获取准确的登录后价格</li>
+            <li>自动保存登录状态（Cookies），下次运行无需重复登录</li>
+            <li>提供 Web 操作界面，通过浏览器即可操作，无需命令行知识</li>
+            <li>爬取结果导出为 Excel 文件，方便后续分析</li>
+        </ul>
+    </div>
+
+    <!-- 2. 环境准备 -->
+    <div class="card" id="prerequisites">
+        <h2><span class="step-num">2</span> 环境准备</h2>
+        <p>在开始之前，请确保你的电脑上安装了以下软件：</p>
+
+        <h3>2.1 Python 3.9+</h3>
+        <p>检查是否已安装：</p>
+        <pre>python3 --version</pre>
+        <p>如果未安装或版本低于 3.9：</p>
+        <table>
+            <tr><th>操作系统</th><th>安装方式</th></tr>
+            <tr>
+                <td><strong>macOS</strong></td>
+                <td>
+                    方式一（推荐）：安装 Homebrew 后运行 <code>brew install python</code><br>
+                    方式二：前往 <code>python.org</code> 下载安装包
+                </td>
+            </tr>
+            <tr>
+                <td><strong>Windows</strong></td>
+                <td>
+                    前往 <code>python.org</code> 下载安装包<br>
+                    <strong>安装时务必勾选 "Add Python to PATH"</strong>
+                </td>
+            </tr>
+        </table>
+
+        <h3>2.2 Google Chrome 浏览器</h3>
+        <p>工具依赖 Chrome 浏览器来爬取数据。请确保已安装 <strong>Google Chrome</strong>（非 Chromium、非 Edge）。</p>
+        <div class="info-box">
+            💡 工具会自动检测你的 Chrome 版本并下载匹配的 ChromeDriver，无需手动配置。
+        </div>
+
+        <h3>2.3 Git（可选）</h3>
+        <p>用于从 GitHub 下载代码。如果你不熟悉 Git，也可以直接下载 ZIP 压缩包（见下一步）。</p>
+        <p>检查是否已安装：</p>
+        <pre>git --version</pre>
+    </div>
+
+    <!-- 3. 下载代码 -->
+    <div class="card" id="download">
+        <h2><span class="step-num">3</span> 下载项目代码</h2>
+
+        <h3>方式一：使用 Git 克隆（推荐）</h3>
+        <p>打开终端（macOS）或命令提示符（Windows），运行：</p>
+        <pre>git clone https://github.com/GordonWang1878/JD-Crawler.git
+cd JD-Crawler</pre>
+
+        <h3>方式二：下载 ZIP 压缩包</h3>
+        <ol>
+            <li>在浏览器中打开项目 GitHub 页面</li>
+            <li>点击绿色的 <strong>"Code"</strong> 按钮</li>
+            <li>选择 <strong>"Download ZIP"</strong></li>
+            <li>解压到你想放置的目录</li>
+            <li>在终端中 <code>cd</code> 进入解压后的文件夹</li>
+        </ol>
+    </div>
+
+    <!-- 4. 安装依赖 -->
+    <div class="card" id="install">
+        <h2><span class="step-num">4</span> 安装 Python 依赖</h2>
+        <p>在项目根目录下运行：</p>
+        <pre>pip3 install -r requirements.txt</pre>
+
+        <div class="warn-box">
+            ⚠️ <strong>Windows 用户注意：</strong>如果 <code>pip3</code> 命令不存在，请尝试使用 <code>pip</code> 代替。
+        </div>
+
+        <p>安装完成后，可以验证关键包是否安装成功：</p>
+        <pre>python3 -c "import flask; import selenium; import undetected_chromedriver; print('✓ 所有依赖安装成功')"</pre>
+    </div>
+
+    <!-- 5. 启动服务 -->
+    <div class="card" id="run">
+        <h2><span class="step-num">5</span> 启动服务</h2>
+        <p>在项目根目录下运行：</p>
+        <pre>python3 app.py</pre>
+        <p>看到以下输出说明启动成功：</p>
+<pre>======================================================================
+JD Price Crawler
+======================================================================
+
+Open: http://localhost:5001
+
+Press Ctrl+C to stop
+
+ * Running on http://127.0.0.1:5001</pre>
+
+        <div class="tip-box">
+            ✅ 现在打开浏览器，访问 <code>http://localhost:5001</code> 即可看到操作界面。
+        </div>
+
+        <div class="warn-box">
+            ⚠️ <strong>Windows 用户注意：</strong>如果 <code>python3</code> 命令不存在，请尝试使用 <code>python app.py</code>。
+        </div>
+
+        <p><strong>停止服务：</strong>在终端中按 <code>Ctrl + C</code> 即可停止。</p>
+    </div>
+
+    <!-- 6. 使用方法 -->
+    <div class="card" id="usage">
+        <h2><span class="step-num">6</span> 使用方法</h2>
+
+        <h3>6.1 上传 Excel 文件</h3>
+        <ol>
+            <li>打开浏览器，访问 <code>http://localhost:5001</code></li>
+            <li>在页面中点击上传区域，选择包含京东商品链接的 Excel 文件（<code>.xlsx</code> 格式）</li>
+            <li>上传成功后，页面会显示识别到的商品数量</li>
+        </ol>
+
+        <h3>6.2 开始爬取</h3>
+        <ol>
+            <li>点击 <strong>"开始爬取"</strong> 按钮</li>
+            <li>工具会自动打开一个 Chrome 浏览器窗口（这是爬虫在工作，<strong>请不要关闭它</strong>）</li>
+            <li>首次扫码登录后，工具会自动 <strong>warmup</strong>（模拟正常浏览约 30 秒）再开始抓取</li>
+            <li>页面上会实时显示爬取进度和日志；请求间隔随批次逐渐增大（前 10 条 2-4 秒，之后 4-7 秒 / 6-10 秒）</li>
+            <li>若连续 2 条失败，会自动触发 30/60/90 秒冷却并重置会话</li>
+        </ol>
+
+        <h3>6.3 首次登录京东</h3>
+        <div class="info-box">
+            💡 <strong>首次运行</strong>时，工具需要登录你的京东账号才能获取准确价格。
+        </div>
+        <ol>
+            <li>爬虫启动后会自动打开京东登录页面</li>
+            <li>在弹出的 Chrome 窗口中<strong>手动登录京东账号</strong>（推荐使用京东 App 扫码登录）</li>
+            <li>登录成功后，工具会<strong>自动检测</strong>到登录状态并继续爬取</li>
+            <li>登录信息（Cookies）会自动保存为 <code>jd_cookies.pkl</code> 文件</li>
+            <li><strong>下次运行时会自动使用已保存的登录状态</strong>，无需重复登录</li>
+        </ol>
+        <div class="warn-box">
+            ⚠️ 如果长时间未使用，Cookies 可能会过期，届时需要重新登录。工具会自动提示。
+        </div>
+
+        <h3>6.4 下载结果 / 重试失败项</h3>
+        <ol>
+            <li>爬取完成后，页面会显示统计信息（成功数、失败数、下架数、用时等）</li>
+            <li>点击 <strong>"下载结果"</strong> 按钮，即可下载 Excel 结果文件</li>
+            <li>结果文件也会保存在项目的 <code>outputs/</code> 目录下</li>
+            <li>如果有失败或被拦截的条目，可以点击 <strong>"重试失败项"</strong>，工具会复用浏览器会话只重新抓取这些条目</li>
+        </ol>
+    </div>
+
+    <!-- 7. Excel 格式 -->
+    <div class="card" id="excel">
+        <h2><span class="step-num">7</span> Excel 文件格式说明</h2>
+        <p>上传的 Excel 文件可以包含 5 列信息，工具会<strong>全部读入并在"数据预览"标签页显示</strong>：</p>
+
+        <table>
+            <tr><th>字段</th><th>可识别的列名（任一即可）</th><th>说明</th></tr>
+            <tr>
+                <td><strong>品牌</strong></td>
+                <td><code>Brand</code> / <code>品牌</code></td>
+                <td>仅展示，便于识别</td>
+            </tr>
+            <tr>
+                <td><strong>型号（Item）</strong></td>
+                <td><code>Item</code> / <code>Model</code> / <code>型号</code></td>
+                <td>仅展示，用于在结果中识别商品</td>
+            </tr>
+            <tr>
+                <td><strong>商品链接</strong></td>
+                <td><code>URL</code> / <code>ProductUrl Std</code> / <code>链接</code></td>
+                <td>抓取目标。缺失时由 Product Key 自动构造</td>
+            </tr>
+            <tr>
+                <td><strong>商品 ID</strong></td>
+                <td><code>Product Key</code> / <code>ProductKey</code> / <code>SKU</code></td>
+                <td>京东商品 ID（例：<code>100140584252</code>）</td>
+            </tr>
+            <tr>
+                <td><strong>参考价</strong></td>
+                <td><code>Price Reference</code> / <code>参考价</code></td>
+                <td>仅展示，便于人工对比</td>
+            </tr>
+        </table>
+
+        <div class="info-box">
+            💡 <strong>列名匹配规则：</strong>不区分大小写、空格、下划线，并支持前缀变体。例如 <code>Price Reference_0</code>、<code>BRAND</code>、<code>ProductUrl Std</code> 都能被识别。
+        </div>
+
+        <div class="tip-box">
+            ✅ <strong>最简要求：</strong>至少有 URL 或 Product Key 其中之一，其他字段可为空。
+        </div>
+    </div>
+
+    <!-- 8. 输出结果 -->
+    <div class="card" id="output">
+        <h2><span class="step-num">8</span> 输出结果说明</h2>
+        <p>爬取完成后会生成 Excel 文件（命名格式：<code>Price_Marks_时间戳.xlsx</code>），保存在 <code>outputs/</code> 目录下，包含以下列：</p>
+        <table>
+            <tr><th>列名</th><th>说明</th></tr>
+            <tr><td><code>Batch Time</code></td><td>本次批量爬取的开始时间</td></tr>
+            <tr><td><code>Crawl Time</code></td><td>该商品的爬取时间</td></tr>
+            <tr><td><code>Brand</code></td><td>品牌（来自输入）</td></tr>
+            <tr><td><code>Item</code></td><td>型号（来自输入）</td></tr>
+            <tr><td><code>URL</code></td><td>商品链接</td></tr>
+            <tr><td><code>Product Key</code></td><td>京东商品 ID</td></tr>
+            <tr><td><code>Price Reference</code></td><td>参考价（来自输入）</td></tr>
+            <tr><td><code>Status</code></td><td>抓取状态，详见下表</td></tr>
+            <tr><td><code>Price</code></td><td>原价（日常价 / 划线价）</td></tr>
+            <tr><td><code>Promotion Price</code></td><td>促销价（到手价 / 补贴价）</td></tr>
+        </table>
+
+        <p><strong>Status 字段取值：</strong></p>
+        <table>
+            <tr><th>值</th><th>含义</th><th>可重试</th></tr>
+            <tr><td><code>success</code></td><td>成功抓到原价和促销价</td><td>—</td></tr>
+            <tr><td><code>partial</code></td><td>只抓到其中一个价格</td><td>✓</td></tr>
+            <tr><td><code>failed</code></td><td>未知错误或无法提取价格</td><td>✓</td></tr>
+            <tr><td><code>blocked</code></td><td>反爬拦截（重定向到首页或验证页）</td><td>✓</td></tr>
+            <tr><td><code>forbidden</code></td><td>403 禁止访问</td><td>✓</td></tr>
+            <tr><td><code>unavailable</code></td><td>商品已下架（页面显示"已下柜"等）</td><td>—</td></tr>
+            <tr><td><code>not_found</code></td><td>商品不存在（URL 重定向到 <code>www.jd.com/?d</code>）</td><td>—</td></tr>
+        </table>
+        <div class="info-box">
+            💡 点击 Web 界面的 <strong>"重试失败项"</strong> 会自动重新抓取所有标记为可重试的条目。
+        </div>
+    </div>
+
+    <!-- 9. FAQ -->
+    <div class="card" id="faq">
+        <h2><span class="step-num">9</span> 常见问题排查</h2>
+
+        <h3>Q: 启动时提示端口 5001 被占用？</h3>
+        <p>说明有其他程序占用了 5001 端口。解决方法：</p>
+        <pre># macOS / Linux：找到并终止占用端口的进程
+lsof -ti:5001 | xargs kill -9
+
+# 然后重新启动
+python3 app.py</pre>
+
+        <h3>Q: 出现 ChromeDriver 版本不匹配的错误？</h3>
+        <p>错误信息类似：<code>This version of ChromeDriver only supports Chrome version XXX</code></p>
+        <p>通常是 ChromeDriver 缓存过期导致的。解决方法：</p>
+        <pre># 升级 undetected-chromedriver 包
+pip3 install --upgrade undetected-chromedriver
+
+# 重新启动
+python3 app.py</pre>
+
+        <h3>Q: 爬取时大量商品显示 "blocked" 或 "forbidden"？</h3>
+        <p>京东的反爬机制触发了。工具已内置冷却和请求节流，但若 IP 被系统级标记，仍会全批失败。建议：</p>
+        <ul>
+            <li>暂停 2-3 小时后再重试（严重时可能需要切换网络 / 更换 IP）</li>
+            <li>确保已登录京东账号</li>
+            <li>单次爬取控制在 200 条以内，避免短时间内反复批量跑</li>
+            <li>用完后不要立即关闭浏览器窗口，工具会复用会话降低风险</li>
+        </ul>
+
+        <h3>Q: 首次启动时，"Initializing browser..." 卡几分钟？</h3>
+        <p><code>undetected-chromedriver</code> 需要从 Google 服务器下载匹配的 ChromeDriver。国内网络访问较慢时首次可能耗时 3-5 分钟。</p>
+        <ul>
+            <li>下载完成后会缓存到 <code>~/Library/Application Support/undetected_chromedriver/</code>（macOS），后续启动只需数秒</li>
+            <li>请耐心等待，<strong>不要手动终止进程</strong>——中断会导致下载失败，下次还要重新下载</li>
+            <li>如果实在无法下载，可尝试开启代理后重新启动</li>
+        </ul>
+
+        <h3>Q: 为什么一条正常可访问的商品被标记为 blocked？</h3>
+        <p>这是反爬保护：被重定向到首页时，除非 URL 明确是 <code>https://www.jd.com/?d</code>（下架/失效商品），否则都按 "可重试" 处理。点击"重试失败项"即可。</p>
+
+        <h3>Q: Cookies 过期了怎么办？</h3>
+        <p>删除项目根目录下的 <code>jd_cookies.pkl</code> 文件，然后重新运行。工具会引导你重新登录。</p>
+        <pre># 删除旧的 cookies
+rm jd_cookies.pkl
+
+# 重新启动
+python3 app.py</pre>
+
+        <h3>Q: Windows 上运行 <code>python3</code> 提示找不到命令？</h3>
+        <p>Windows 上 Python 命令通常是 <code>python</code>（不带 3），同理 <code>pip</code> 代替 <code>pip3</code>：</p>
+        <pre>python app.py</pre>
+
+        <h3>Q: 安装依赖时报错 "pip not found"？</h3>
+        <p>尝试以下命令：</p>
+        <pre># 方式一
+python3 -m pip install -r requirements.txt
+
+# 方式二（Windows）
+python -m pip install -r requirements.txt</pre>
+    </div>
+
+    <!-- 10. AI Coding 一键部署 -->
+    <div class="card" id="ai-deploy">
+        <h2><span class="step-num">10</span> 使用 AI Coding 智能体一键部署</h2>
+
+        <p>如果你使用 AI Coding 工具（如 <strong>Claude Code</strong>、<strong>Cursor</strong>、<strong>GitHub Copilot</strong>、<strong>Windsurf</strong> 等），可以将下面的提示词直接发送给你的 AI 智能体，让它自动完成全部安装和部署工作。</p>
+
+        <div class="tip-box">
+            ✅ <strong>自动化范围：</strong>AI 智能体可以自动完成环境检查、代码下载、依赖安装、服务启动的全部步骤。你只需要在首次登录京东时手动扫码。
+        </div>
+
+        <h3>10.1 使用方式</h3>
+        <ol>
+            <li>打开你的 AI Coding 工具（终端内或 IDE 内均可）</li>
+            <li>复制下方的提示词，粘贴发送给 AI 智能体</li>
+            <li>AI 会自动逐步执行，遇到问题会自行排查修复</li>
+            <li>当 AI 提示"需要登录京东"时，在弹出的 Chrome 窗口中手动扫码登录</li>
+            <li>登录完成后，AI 会继续完成剩余步骤</li>
+        </ol>
+
+        <h3>10.2 一键部署提示词</h3>
+        <div class="info-box">
+            💡 复制以下全部内容，直接粘贴给你的 AI Coding 智能体即可。
+        </div>
+
+<pre style="background: #1a237e; color: #e8eaf6; white-space: pre-wrap; word-wrap: break-word;">
+请帮我在本机部署「JD 价格爬虫」工具。请按以下步骤顺序执行，每一步都要验证成功后再进行下一步：
+
+== 第一步：环境检查 ==
+1. 检查 Python 版本（需要 3.9+）：运行 python3 --version（如果失败则尝试 python --version）
+2. 检查 Git 是否安装：运行 git --version
+3. 检查 Google Chrome 是否安装：
+   - macOS：检查 /Applications/Google Chrome.app 是否存在
+   - Windows：检查 "C:\Program Files\Google\Chrome\Application\chrome.exe" 是否存在
+   - Linux：检查 google-chrome --version
+4. 如果 Python 或 Chrome 未安装，告诉我需要先安装什么，不要继续后续步骤。
+
+== 第二步：下载项目代码 ==
+1. 运行：git clone https://github.com/GordonWang1878/JD-Crawler.git
+2. 进入项目目录：cd JD-Crawler
+3. 验证：确认 app.py 和 requirements.txt 文件存在
+
+== 第三步：安装 Python 依赖 ==
+1. 运行：pip3 install -r requirements.txt（Windows 上用 pip）
+2. 验证安装：运行 python3 -c "import flask; import selenium; import undetected_chromedriver; print('依赖安装成功')"
+3. 如果安装失败，尝试：python3 -m pip install -r requirements.txt
+
+== 第四步：启动服务 ==
+1. 在项目根目录运行：python3 app.py（Windows 上用 python app.py）
+2. 确认输出中包含 "访问: http://localhost:5001"
+3. 告诉我：服务已启动，请在浏览器中打开 http://localhost:5001
+
+== 第五步：指导使用 ==
+服务启动成功后，告诉我以下操作步骤：
+1. 在浏览器中打开 http://localhost:5001
+2. 上传包含京东商品链接的 Excel 文件
+3. 点击"开始爬取"
+4. 首次运行时，需要在弹出的 Chrome 窗口中手动登录京东（扫码登录）
+5. 登录后工具会自动继续爬取，完成后可下载结果 Excel
+
+注意事项：
+- 如果遇到端口 5001 被占用，请先终止占用进程再重试
+- 如果遇到 ChromeDriver 版本错误，运行 pip3 install --upgrade undetected-chromedriver 然后重试
+- 需要停止服务时按 Ctrl+C
+</pre>
+
+        <h3>10.3 需要人工介入的环节</h3>
+        <div class="warn-box">
+            ⚠️ <strong>以下环节 AI 无法自动完成，需要你手动操作：</strong>
+        </div>
+        <table>
+            <tr><th>环节</th><th>说明</th><th>何时发生</th></tr>
+            <tr>
+                <td><strong>安装 Python / Chrome</strong></td>
+                <td>如果你的电脑上尚未安装 Python 或 Chrome，需要你自行下载安装</td>
+                <td>仅在环境检查不通过时</td>
+            </tr>
+            <tr>
+                <td><strong>京东账号登录</strong></td>
+                <td>首次爬取时需要在弹出的 Chrome 窗口中手动扫码登录京东</td>
+                <td>首次运行爬取 / Cookies 过期时</td>
+            </tr>
+            <tr>
+                <td><strong>上传 Excel 并触发爬取</strong></td>
+                <td>在 Web 界面中上传文件、点击开始爬取</td>
+                <td>每次使用时</td>
+            </tr>
+        </table>
+
+        <h3>10.4 部署完成后的日常使用</h3>
+        <p>部署只需要做一次。之后每次使用只需要：</p>
+<pre># 进入项目目录
+cd JD-Crawler
+
+# 启动服务
+python3 app.py
+
+# 然后在浏览器中打开 http://localhost:5001 即可使用</pre>
+        <p>你也可以告诉 AI 智能体：</p>
+<pre style="background: #1a237e; color: #e8eaf6;">帮我启动 JD-Crawler 目录下的 JD 价格爬虫服务</pre>
+    </div>
+
+    <div class="footer">
+        JD 价格爬虫 &copy; 2026 &mdash; 部署与使用指南
+    </div>
+
+</div>
+
+</body>
+</html>
