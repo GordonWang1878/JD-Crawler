@@ -1,791 +1,1149 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JD价格爬虫 - 批量爬取</title>
-
-    <!-- Google Material Icons -->
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <!-- Google Fonts - Roboto -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <!-- Bootstrap CSS (for grid system only) -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <style>
-        /* Material Design 风格 */
-        * {
-            font-family: 'Roboto', 'Noto Sans SC', sans-serif;
-        }
-
-        :root {
-            /* Material Design Color Palette */
-            --md-primary: #455a64;           /* Blue Grey 700 */
-            --md-primary-light: #607d8b;     /* Blue Grey 500 */
-            --md-primary-dark: #37474f;      /* Blue Grey 800 */
-            --md-accent: #00bfa5;            /* Teal A700 */
-            --md-accent-light: #1de9b6;      /* Teal A400 */
-            --md-success: #4caf50;           /* Green 500 */
-            --md-error: #f44336;             /* Red 500 */
-            --md-warning: #ff9800;           /* Orange 500 */
-            --md-info: #2196f3;              /* Blue 500 */
-            --md-bg: #fafafa;                /* Grey 50 */
-            --md-surface: #ffffff;
-            --md-text-primary: rgba(0,0,0,0.87);
-            --md-text-secondary: rgba(0,0,0,0.54);
-            --md-text-disabled: rgba(0,0,0,0.38);
-
-            /* Material Design Elevation Shadows */
-            --md-shadow-1: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
-            --md-shadow-2: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
-            --md-shadow-3: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
-            --md-shadow-4: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
-            --md-shadow-5: 0 19px 38px rgba(0,0,0,0.30), 0 15px 12px rgba(0,0,0,0.22);
-        }
-
-        body {
-            background: var(--md-bg);
-            margin: 0;
-            padding: 16px;
-            color: var(--md-text-primary);
-        }
-
-        .container {
-            max-width: 1400px;
-        }
-
-        /* Material Card */
-        .md-card {
-            background: var(--md-surface);
-            border-radius: 4px;
-            box-shadow: var(--md-shadow-2);
-            margin-bottom: 16px;
-            transition: box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-            overflow: hidden;
-        }
-
-        .md-card:hover {
-            box-shadow: var(--md-shadow-3);
-        }
-
-        .md-card-header {
-            background: #546e7a;  /* Blue Grey 600 - 中等灰蓝 */
-            color: white;
-            padding: 16px 20px;
-            font-size: 16px;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            letter-spacing: 0.5px;
-            height: 56px;
-            box-sizing: border-box;
-        }
-
-        .md-card-header.accent {
-            background: #78909c;  /* Blue Grey 400 - 更浅的灰蓝 */
-        }
-
-        .md-card-header.dark {
-            background: #263238;  /* Blue Grey 900 - 与日志容器一样深 */
-        }
-
-        .md-card-header .material-icons {
-            margin-right: 12px;
-            font-size: 20px;
-        }
-
-        .md-card-header.with-action {
-            justify-content: space-between;
-        }
-
-        .md-card-header.with-action > span {
-            display: flex;
-            align-items: center;
-        }
-
-        .md-card-body {
-            padding: 20px;
-        }
-
-        .md-card-body.log-body {
-            padding: 20px 20px 12px 20px;
-        }
-
-        .md-card-body.log-body .log-container {
-            height: calc(100vh - 212px);
-        }
-
-        /* Page Title */
-        .page-title {
-            text-align: center;
-            margin-bottom: 24px;
-        }
-
-        .page-title h1 {
-            font-size: 32px;
-            font-weight: 500;
-            color: var(--md-primary);
-            margin: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-        }
-
-        .page-title h1 .material-icons {
-            font-size: 36px;
-            color: var(--md-accent);
-        }
-
-        .page-title p {
-            color: var(--md-text-secondary);
-            margin: 8px 0 0 0;
-            font-size: 14px;
-        }
-
-        /* Upload Area */
-        .upload-area {
-            border: 2px dashed rgba(0,0,0,0.12);
-            border-radius: 4px;
-            padding: 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            background: #fafafa;
-        }
-
-        .upload-area:hover {
-            border-color: var(--md-accent);
-            background: #f5f5f5;
-        }
-
-        .upload-area.dragover {
-            border-color: var(--md-accent);
-            border-style: solid;
-            background: #e0f2f1;
-        }
-
-        .upload-area .material-icons {
-            font-size: 40px;
-            color: var(--md-text-secondary);
-            margin-bottom: 6px;
-        }
-
-        .upload-area h5 {
-            font-size: 16px;
-            font-weight: 400;
-            margin: 0 0 4px 0;
-            color: var(--md-text-primary);
-        }
-
-        .upload-area p {
-            font-size: 14px;
-            color: var(--md-text-secondary);
-            margin: 0;
-        }
-
-        /* Alert */
-        .md-alert {
-            background: #e8f5e9;
-            border-left: 4px solid var(--md-success);
-            padding: 12px 16px;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            margin-top: 16px;
-        }
-
-        .md-alert .material-icons {
-            color: var(--md-success);
-            margin-right: 12px;
-            font-size: 20px;
-        }
-
-        .md-alert-text {
-            font-size: 14px;
-            color: rgba(0,0,0,0.87);
-        }
-
-        /* Material Buttons */
-        .md-btn {
-            background: var(--md-primary);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 10px 24px;
-            font-size: 14px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 1.25px;
-            cursor: pointer;
-            box-shadow: var(--md-shadow-2);
-            transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            position: relative;
-            overflow: hidden;
-            width: 100%;
-            margin-top: 12px;
-        }
-
-        .md-btn:hover:not(:disabled) {
-            box-shadow: var(--md-shadow-3);
-            background: var(--md-primary-light);
-        }
-
-        .md-btn:active:not(:disabled) {
-            box-shadow: var(--md-shadow-1);
-        }
-
-        .md-btn:disabled {
-            background: rgba(0,0,0,0.12);
-            color: rgba(0,0,0,0.26);
-            box-shadow: none;
-            cursor: not-allowed;
-        }
-
-        .md-btn.primary {
-            background: var(--md-primary);
-        }
-
-        .md-btn.primary:hover:not(:disabled) {
-            background: #546e7a;
-        }
-
-        .md-btn.success {
-            background: var(--md-success);
-        }
-
-        .md-btn.success:hover:not(:disabled) {
-            background: #66bb6a;
-        }
-
-        .md-btn.danger {
-            background: #ef6c00;  /* Orange 800 - 暗橘色 */
-        }
-
-        .md-btn.danger:hover:not(:disabled) {
-            background: #f57c00;  /* Orange 700 - hover时稍浅 */
-        }
-
-        .md-btn.accent {
-            background: var(--md-accent);
-        }
-
-        .md-btn.accent:hover:not(:disabled) {
-            background: var(--md-accent-light);
-        }
-
-        .md-btn .material-icons {
-            font-size: 18px;
-        }
-
-        /* Small button for clear log */
-        .md-btn-small {
-            background: transparent;
-            color: white;
-            border: 1px solid rgba(255,255,255,0.5);
-            border-radius: 4px;
-            padding: 4px 12px;
-            font-size: 12px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            cursor: pointer;
-            transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .md-btn-small:hover {
-            background: rgba(255,255,255,0.1);
-            border-color: white;
-        }
-
-        /* Progress Bar */
-        .md-progress-container {
-            margin-bottom: 16px;
-        }
-
-        .md-progress-text {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 12px;
-            color: var(--md-text-secondary);
-            font-weight: 500;
-        }
-
-        .md-progress-bar {
-            width: 100%;
-            height: 4px;
-            background: rgba(0,0,0,0.12);
-            border-radius: 2px;
-            overflow: hidden;
-        }
-
-        .md-progress-bar-fill {
-            height: 100%;
-            background: var(--md-accent);
-            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .md-progress-bar-fill::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-            animation: shimmer 2s infinite;
-        }
-
-        @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-
-        /* Current Product */
-        .current-product {
-            margin-bottom: 16px;
-            padding: 12px;
-            background: #f5f5f5;
-            border-radius: 4px;
-        }
-
-        .current-product-label {
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--md-text-secondary);
-            margin-bottom: 4px;
-        }
-
-        .current-product-value {
-            font-size: 14px;
-            color: var(--md-text-primary);
-            font-style: italic;
-        }
-
-        /* Statistics */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-            margin-top: 16px;
-        }
-
-        .stat-item {
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 32px;
-            font-weight: 500;
-            line-height: 1;
-            margin-bottom: 4px;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .stat-value.success { color: var(--md-success); }
-        .stat-value.error { color: var(--md-error); }
-        .stat-value.warning { color: var(--md-warning); }
-        .stat-value.info { color: var(--md-info); }
-        .stat-value.muted { color: var(--md-primary); }
-
-        .stat-label {
-            font-size: 12px;
-            color: var(--md-text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* Log Container */
-        .log-container {
-            background: #263238;
-            border-radius: 4px;
-            padding: 16px;
-            height: calc(100vh - 300px);
-            overflow-y: auto;
-            font-family: 'Roboto Mono', 'Consolas', monospace;
-        }
-
-        .log-entry {
-            padding: 6px 8px;
-            margin-bottom: 4px;
-            border-radius: 2px;
-            font-size: 13px;
-            line-height: 1.5;
-            transition: background 0.15s;
-        }
-
-        .log-entry:hover {
-            background: rgba(255,255,255,0.05);
-        }
-
-        .log-timestamp {
-            color: #78909c;
-            font-size: 11px;
-            margin-right: 8px;
-        }
-
-        .log-level-INFO {
-            color: #4dd0e1;
-            font-weight: 500;
-            margin-right: 8px;
-        }
-
-        .log-level-WARNING {
-            color: #ffb74d;
-            font-weight: 500;
-            margin-right: 8px;
-        }
-
-        .log-level-ERROR {
-            color: #ef5350;
-            font-weight: 500;
-            margin-right: 8px;
-        }
-
-        .log-message {
-            color: #eceff1;
-        }
-
-        /* Scrollbar */
-        .log-container::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .log-container::-webkit-scrollbar-track {
-            background: rgba(0,0,0,0.2);
-        }
-
-        .log-container::-webkit-scrollbar-thumb {
-            background: rgba(255,255,255,0.2);
-            border-radius: 4px;
-        }
-
-        .log-container::-webkit-scrollbar-thumb:hover {
-            background: rgba(255,255,255,0.3);
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .page-title h1 {
-                font-size: 24px;
-            }
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>京东价格爬虫</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&family=Noto+Sans+SC:wght@300;400;500;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --xuan: #F5F0E8;
+  --xuan-dark: #EDE6D8;
+  --ink: #2C2C2C;
+  --ink-light: #4A4A4A;
+  --ink-faint: #8A8578;
+  --cinnabar: #C23A2A;
+  --cinnabar-light: #D4564A;
+  --cinnabar-dark: #9E2E22;
+  --gold: #C4A265;
+  --gold-light: #D4B87A;
+  --gold-faint: rgba(196,162,101,0.15);
+  --font-title: 'ZCOOL XiaoWei', serif;
+  --font-body: 'Noto Sans SC', sans-serif;
+  --font-num: 'Lora', serif;
+}
+
+html { font-size: 14px; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--xuan);
+  color: var(--ink);
+  height: 100vh;
+  overflow: hidden;
+  background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+}
+
+/* ===== Ink Wash Top Strip ===== */
+.ink-strip {
+  position: relative;
+  width: 100%;
+  height: 60px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.ink-strip svg { width:100%; height:100%; display:block; }
+
+/* ===== Header ===== */
+.header {
+  position: relative;
+  padding: 0 40px;
+  margin-top: -28px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+/* Seal stamp */
+.seal-stamp {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  transform: rotate(-8deg);
+  cursor: default;
+  transition: transform 0.3s ease;
+}
+.seal-stamp:hover { transform: rotate(-4deg) scale(1.05); }
+.seal-stamp svg { width:100%; height:100%; }
+
+.title-group h1 {
+  font-family: var(--font-title);
+  font-size: 2rem;
+  color: var(--ink);
+  letter-spacing: 5px;
+  line-height: 1.2;
+}
+
+.title-sub {
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  letter-spacing: 1px;
+  font-weight: 300;
+  margin-top: 1px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 6px;
+}
+
+.conn-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-num);
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+}
+
+.conn-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cinnabar);
+  transition: all 0.3s;
+}
+.conn-dot.on { background: #4a9; }
+
+.ver-tag {
+  font-family: var(--font-num);
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+}
+
+/* ===== Main Layout ===== */
+.app-layout {
+  display: flex;
+  height: calc(100vh - 86px);
+  padding: 20px 40px 0;
+  gap: 0;
+}
+
+/* ===== Left Panel ===== */
+.panel-left {
+  width: 260px;
+  min-width: 260px;
+  position: relative;
+  padding-right: 28px;
+  overflow-y: auto;
+  padding-bottom: 24px;
+}
+.panel-left::-webkit-scrollbar { width:0; }
+
+/* Scroll border decoration */
+.panel-left::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 10px;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, transparent 0%, var(--gold) 8%, var(--gold) 15%, transparent 18%, var(--ink-faint) 22%, var(--ink-faint) 78%, transparent 82%, var(--gold) 85%, var(--gold) 92%, transparent 100%);
+  opacity: 0.3;
+}
+
+.sec-label {
+  font-family: var(--font-title);
+  font-size: 0.95rem;
+  color: var(--ink);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  letter-spacing: 2px;
+}
+.sec-label::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--cinnabar);
+  flex-shrink: 0;
+}
+.sec-gap { margin-top: 22px; }
+
+/* Upload */
+.upload-zone {
+  position: relative;
+  padding: 20px 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.upload-zone svg.brush-border {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.upload-zone:hover { background: var(--gold-faint); }
+.upload-zone.dragover { background: var(--gold-faint); transform: scale(1.02); }
+.upload-zone.uploaded { background: rgba(74,153,120,0.04); }
+.upload-zone.uploaded svg.brush-border path { stroke: #4a9; }
+
+.upload-icon-svg {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 6px;
+  opacity: 0.4;
+}
+.upload-hint {
+  font-size: 0.82rem;
+  color: var(--ink-faint);
+  line-height: 1.6;
+}
+.upload-hint strong {
+  color: var(--ink-light);
+  font-weight: 500;
+}
+
+/* File badge */
+.file-badge {
+  display: none;
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(196,162,101,0.08);
+  border-left: 2px solid var(--gold);
+  font-size: 0.78rem;
+  color: var(--ink-light);
+  line-height: 1.5;
+}
+.file-badge.vis { display: block; animation: fadeUp 0.3s ease-out; }
+.file-badge .fname { font-weight: 500; color: var(--ink); }
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* Buttons */
+.btn-group { display: flex; flex-direction: column; gap: 7px; }
+.btn {
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  padding: 9px 14px;
+  border: none;
+  cursor: pointer;
+  letter-spacing: 2px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.btn svg { width:13px; height:13px; flex-shrink:0; }
+
+.btn-primary { background: var(--cinnabar); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--cinnabar-dark); }
+.btn-primary:disabled { background: var(--xuan-dark); color: var(--ink-faint); cursor: not-allowed; }
+.btn-outline { background: transparent; color: var(--ink-light); border: 1px solid rgba(44,44,44,0.18); }
+.btn-outline:hover { border-color: var(--ink); color: var(--ink); }
+.btn-gold { background: var(--gold); color: #fff; }
+.btn-gold:hover { background: var(--gold-light); }
+.btn-amber { background: transparent; color: var(--gold); border: 1px solid var(--gold); }
+.btn-amber:hover { background: var(--gold); color: #fff; }
+.hidden { display: none !important; }
+
+/* Quick query */
+.qc-row { display: flex; gap: 5px; }
+.qc-input {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  padding: 7px 10px;
+  border: 1px solid rgba(44,44,44,0.13);
+  background: rgba(255,255,255,0.5);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.qc-input:focus { border-color: var(--gold); }
+.qc-input::placeholder { color: var(--ink-faint); }
+
+.qc-result {
+  display: none;
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.4);
+  border-left: 2px solid var(--gold);
+  font-size: 0.78rem;
+}
+.qc-result.vis { display: block; animation: fadeUp 0.3s ease-out; }
+.qc-result .qr { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.qc-result .qr:last-child { margin-bottom: 0; }
+.qc-result .ql { color: var(--ink-faint); }
+.qc-result .qv { font-family: var(--font-num); font-weight: 600; color: var(--ink); }
+.qc-result .qv.ok { color: var(--cinnabar); }
+.qc-result .qv.err { color: var(--ink-faint); }
+
+/* Progress */
+.progress-box { display: none; flex-direction: column; gap: 6px; }
+.progress-box.vis { display: flex; animation: fadeUp 0.3s ease-out; }
+
+.prog-nums {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+.prog-cur {
+  font-family: var(--font-num);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--cinnabar);
+  line-height: 1;
+}
+.prog-div {
+  font-family: var(--font-num);
+  font-size: 0.9rem;
+  color: var(--ink-faint);
+  margin: 0 2px;
+}
+.prog-tot {
+  font-family: var(--font-num);
+  font-size: 1rem;
+  color: var(--ink-light);
+}
+.prog-pct {
+  font-family: var(--font-num);
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  margin-left: 6px;
+}
+
+.prog-track {
+  width: 100%;
+  height: 3px;
+  background: rgba(44,44,44,0.07);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.prog-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--cinnabar), var(--cinnabar-light));
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+.prog-current {
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Stats vertical */
+.stats-v { display: none; gap: 14px; margin-top: 10px; }
+.stats-v.vis { display: flex; }
+.stat-col { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.stat-col .sv { font-family: var(--font-num); font-size: 1.2rem; font-weight: 600; line-height: 1; }
+.stat-col .sl { writing-mode: vertical-rl; font-size: 0.7rem; color: var(--ink-faint); letter-spacing: 3px; margin-top: 4px; }
+.stat-col.s-ok .sv { color: var(--cinnabar); }
+.stat-col.s-fail .sv { color: var(--ink-faint); }
+.stat-col.s-warn .sv { color: var(--gold); }
+.stat-col.s-total .sv { color: var(--ink); }
+
+/* Done banner */
+.done-banner {
+  display: none;
+  padding: 8px 10px;
+  background: rgba(74,153,120,0.06);
+  border-left: 2px solid #4a9;
+  font-size: 0.78rem;
+  color: #3a7a5a;
+  align-items: center;
+  gap: 6px;
+}
+.done-banner.vis { display: flex; animation: fadeUp 0.3s ease-out; }
+.done-banner svg { width: 14px; height: 14px; stroke: #4a9; fill: none; stroke-width: 2; flex-shrink: 0; }
+
+/* ===== Right Panel ===== */
+.panel-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Tabs */
+.tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid rgba(44,44,44,0.1);
+  margin-bottom: 0;
+  flex-shrink: 0;
+  align-items: center;
+}
+.tab-item {
+  font-family: var(--font-title);
+  font-size: 0.88rem;
+  padding: 9px 20px;
+  cursor: pointer;
+  color: var(--ink-faint);
+  letter-spacing: 2px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  position: relative;
+}
+.tab-item:hover { color: var(--ink); }
+.tab-item.active { color: var(--ink); border-bottom-color: var(--cinnabar); }
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: var(--cinnabar);
+  border-radius: 50%;
+}
+.tab-item .tc {
+  font-family: var(--font-num);
+  font-size: 0.7rem;
+  color: var(--ink-faint);
+  margin-left: 4px;
+}
+.tab-item.active .tc { color: var(--cinnabar); }
+.tab-spacer { flex: 1; }
+.tab-action {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  background: none;
+  border: 1px solid rgba(44,44,44,0.12);
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-right: 4px;
+}
+.tab-action:hover { border-color: var(--ink); color: var(--ink); }
+
+/* Tab content */
+.tab-content { flex: 1; overflow: hidden; position: relative; }
+.tab-pane { position: absolute; inset: 0; display: none; flex-direction: column; overflow: hidden; }
+.tab-pane.active { display: flex; }
+
+/* Ink divider */
+.ink-divider {
+  width: 100%;
+  height: 6px;
+  flex-shrink: 0;
+  opacity: 0.15;
+  margin: 10px 0 6px;
+}
+
+/* Data table */
+.table-wrap { flex: 1; overflow: auto; }
+.table-wrap::-webkit-scrollbar { width:5px; height:5px; }
+.table-wrap::-webkit-scrollbar-track { background:transparent; }
+.table-wrap::-webkit-scrollbar-thumb { background:rgba(44,44,44,0.1); border-radius:3px; }
+
+.data-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+.data-table thead { position:sticky; top:0; z-index:2; }
+.data-table th {
+  font-weight: 500;
+  font-size: 0.76rem;
+  color: var(--ink-faint);
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(44,44,44,0.1);
+  letter-spacing: 1px;
+  white-space: nowrap;
+  background: var(--xuan);
+}
+.data-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(44,44,44,0.04);
+  vertical-align: middle;
+}
+.data-table tr:hover td { background: rgba(196,162,101,0.05); }
+.data-table .col-idx { color: var(--ink-faint); font-family: var(--font-num); font-size: 0.75rem; text-align: center; width: 40px; }
+.data-table .col-sku { font-family: var(--font-num); font-size: 0.8rem; color: var(--ink-light); letter-spacing: 0.3px; }
+.data-table .col-brand { font-size: 0.8rem; color: var(--ink-light); white-space: nowrap; }
+.data-table .col-item { font-size: 0.82rem; color: var(--ink); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.data-table .col-url { font-size: 0.75rem; color: var(--ink-faint); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.data-table .col-url a { color: var(--ink-faint); text-decoration: none; border-bottom: 1px dotted rgba(44,44,44,0.2); }
+.data-table .col-url a:hover { color: var(--cinnabar); border-bottom-color: var(--cinnabar); }
+.data-table .col-pref { font-family: var(--font-num); font-size: 0.78rem; color: var(--ink-light); white-space: nowrap; text-align: right; }
+.data-table .col-price { font-family: var(--font-num); font-weight: 600; color: var(--cinnabar); white-space: nowrap; text-align: right; }
+.data-table .col-promo { font-family: var(--font-num); font-weight: 600; color: var(--gold); white-space: nowrap; text-align: right; }
+.data-table .col-time { font-family: var(--font-num); font-size: 0.72rem; color: var(--ink-faint); white-space: nowrap; }
+
+/* Status badges with seal */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.75rem;
+  padding: 1px 7px;
+  border-radius: 2px;
+}
+.badge-ok { color: var(--cinnabar); background: rgba(194,58,42,0.06); }
+.badge-fail { color: var(--ink-faint); background: rgba(44,44,44,0.05); }
+.badge-warn { color: var(--gold); background: var(--gold-faint); }
+.badge-block { color: var(--ink-faint); background: rgba(44,44,44,0.05); }
+
+.seal-mini { width:11px; height:11px; flex-shrink:0; }
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 8px;
+  opacity: 0.4;
+}
+.empty-state svg { width: 36px; height: 36px; stroke: var(--ink-faint); fill: none; stroke-width: 1; }
+.empty-text { font-size: 0.82rem; color: var(--ink-faint); }
+
+/* Log */
+.log-scroll { flex: 1; overflow-y: auto; padding: 4px 0; }
+.log-scroll::-webkit-scrollbar { width:5px; }
+.log-scroll::-webkit-scrollbar-track { background:transparent; }
+.log-scroll::-webkit-scrollbar-thumb { background:rgba(44,44,44,0.08); border-radius:3px; }
+
+.log-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  transition: background 0.15s;
+}
+.log-line:hover { background: rgba(196,162,101,0.04); }
+.log-line .lt { font-family: var(--font-num); font-size: 0.72rem; color: var(--ink-faint); min-width: 62px; flex-shrink: 0; }
+.log-line .ll { font-family: var(--font-num); font-size: 0.68rem; font-weight: 600; min-width: 48px; flex-shrink: 0; }
+.log-line .ll.INFO { color: var(--ink-light); }
+.log-line .ll.WARNING { color: var(--gold); }
+.log-line .ll.ERROR { color: var(--cinnabar); }
+.log-line .lm { color: var(--ink-light); }
+.log-line.lv-ERROR .lm { color: var(--cinnabar); }
+.log-line.lv-WARNING .lm { color: var(--gold); }
+
+@keyframes lineIn { from{opacity:0;transform:translateX(-4px)} to{opacity:1;transform:translateX(0)} }
+.log-new { animation: lineIn 0.15s ease-out; }
+
+/* History */
+.history-scroll { flex: 1; overflow-y: auto; padding: 8px 0; }
+.history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border-left: 2px solid var(--gold);
+  margin-bottom: 8px;
+  background: rgba(255,255,255,0.3);
+  transition: background 0.2s;
+}
+.history-row:hover { background: rgba(255,255,255,0.5); }
+.history-name { font-size: 0.82rem; font-weight: 500; color: var(--ink); }
+.history-meta { font-family: var(--font-num); font-size: 0.72rem; color: var(--ink-faint); margin-top: 2px; }
+.history-dl {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  color: var(--gold);
+  border: 1px solid var(--gold);
+  padding: 3px 10px;
+  cursor: pointer;
+  background: transparent;
+  transition: all 0.2s;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.history-dl:hover { background: var(--gold); color: #fff; }
+
+/* ===== Seal SVG templates ===== */
+.seal-ok { color: var(--cinnabar); }
+.seal-fail { color: var(--ink-faint); }
+.seal-warn { color: var(--gold); }
+
+/* ===== Scrollbar global ===== */
+::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:rgba(44,44,44,0.1); border-radius:3px; }
+
+/* ===== Animations ===== */
+@keyframes sealStamp {
+  0% { transform:rotate(-8deg) scale(0.3); opacity:0; }
+  60% { transform:rotate(-8deg) scale(1.1); opacity:1; }
+  100% { transform:rotate(-8deg) scale(1); opacity:1; }
+}
+.seal-stamp { animation: sealStamp 0.6s ease-out 0.2s both; }
+
+@keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+.fade-in { animation: fadeIn 0.4s ease-out both; }
+.fd1 { animation-delay:0.05s; }
+.fd2 { animation-delay:0.1s; }
+.fd3 { animation-delay:0.15s; }
+
+/* ===== Responsive ===== */
+@media (max-width:960px) {
+  .app-layout { flex-direction:column; padding:16px 16px 0; height:auto; }
+  .panel-left { width:100%; min-width:0; padding-right:0; padding-bottom:16px; overflow:visible; }
+  .panel-left::after { display:none; }
+  .panel-right { height:60vh; }
+  .header { padding:0 16px; }
+  .stats-v { justify-content:space-around; }
+}
+</style>
 </head>
 <body>
-    <div class="container">
-        <!-- Page Title -->
-        <div class="page-title">
-            <h1>
-                <span class="material-icons">shopping_cart</span>
-                JD价格爬虫
-            </h1>
-            <p>批量获取京东商品价格</p>
-        </div>
 
-        <!-- Main Content -->
-        <div class="row">
-            <!-- Left Column -->
-            <div class="col-md-7">
-                <!-- Upload Card -->
-                <div class="md-card">
-                    <div class="md-card-header">
-                        <span class="material-icons">upload_file</span>
-                        上传商品URL列表
-                    </div>
-                    <div class="md-card-body">
-                        <div id="upload-area" class="upload-area">
-                            <div class="material-icons">cloud_upload</div>
-                            <h5>拖拽Excel文件到这里</h5>
-                            <p>或点击选择文件</p>
-                            <input type="file" id="file-input" accept=".xlsx,.xls" style="display: none;">
-                        </div>
+<!-- Ink Wash Mountain Strip -->
+<div class="ink-strip">
+  <svg viewBox="0 0 1440 60" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="inkFade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#2C2C2C" stop-opacity="0.8"/>
+        <stop offset="50%" stop-color="#2C2C2C" stop-opacity="0.12"/>
+        <stop offset="100%" stop-color="#2C2C2C" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path d="M0,0 L0,22 Q120,38 240,22 Q360,6 480,24 Q600,38 720,18 Q840,4 960,22 Q1080,34 1200,16 Q1320,3 1440,18 L1440,0Z" fill="url(#inkFade)"/>
+    <path d="M0,0 L0,14 Q200,26 400,12 Q600,2 800,16 Q1000,26 1200,10 Q1350,2 1440,12 L1440,0Z" fill="#2C2C2C" opacity="0.7"/>
+    <path d="M0,0 L0,8 Q300,16 600,6 Q900,14 1200,4 L1440,8 L1440,0Z" fill="#2C2C2C" opacity="0.9"/>
+  </svg>
+</div>
 
-                        <div id="file-info" style="display: none;">
-                            <div class="md-alert">
-                                <span class="material-icons">check_circle</span>
-                                <div class="md-alert-text">
-                                    已上传: <strong id="filename">-</strong>
-                                    (<span id="url-count">0</span> 个商品)
-                                </div>
-                            </div>
-                        </div>
+<!-- Header -->
+<div class="header fade-in">
+  <div class="header-left">
+    <div class="seal-stamp">
+      <svg viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="26" cy="26" r="23" fill="none" stroke="#C23A2A" stroke-width="2.5" opacity="0.8"/>
+        <circle cx="26" cy="26" r="20" fill="none" stroke="#C23A2A" stroke-width="0.8" opacity="0.3"/>
+        <text x="26" y="31" text-anchor="middle" font-family="'ZCOOL XiaoWei',serif" font-size="22" fill="#C23A2A" opacity="0.85">价</text>
+      </svg>
+    </div>
+    <div class="title-group">
+      <h1>京东价格爬虫</h1>
+      <div class="title-sub">批量价格采集工具</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="conn-status">
+      <div id="status-dot" class="conn-dot"></div>
+      <span id="status-text">连接中</span>
+    </div>
+    <span class="ver-tag">v2.0</span>
+  </div>
+</div>
 
-                        <!-- Action Buttons -->
-                        <button id="btn-start" class="md-btn primary" disabled>
-                            <span class="material-icons">play_arrow</span>
-                            开始批量爬取
-                        </button>
-                        <button id="btn-stop" class="md-btn danger" style="display: none;">
-                            <span class="material-icons">stop</span>
-                            停止爬取
-                        </button>
-                        <button id="btn-download" class="md-btn success" style="display: none;">
-                            <span class="material-icons">download</span>
-                            下载结果
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Progress Card -->
-                <div class="md-card" id="progress-section" style="display: none;">
-                    <div class="md-card-header accent">
-                        <span class="material-icons">analytics</span>
-                        实时进度
-                    </div>
-                    <div class="md-card-body">
-                        <!-- Progress Bar -->
-                        <div class="md-progress-container">
-                            <div class="md-progress-text">
-                                <span id="progress-text">进度: 0 / 0</span>
-                                <span id="progress-percent">0%</span>
-                            </div>
-                            <div class="md-progress-bar">
-                                <div id="progress-bar-fill" class="md-progress-bar-fill" style="width: 0%"></div>
-                            </div>
-                        </div>
-
-                        <!-- Current Product -->
-                        <div class="current-product">
-                            <div class="current-product-label">当前商品</div>
-                            <div id="current-url" class="current-product-value">等待开始...</div>
-                        </div>
-
-                        <!-- Statistics -->
-                        <div class="stats-grid">
-                            <div class="stat-item">
-                                <div id="stat-success" class="stat-value success">0</div>
-                                <div class="stat-label">成功</div>
-                            </div>
-                            <div class="stat-item">
-                                <div id="stat-failed" class="stat-value error">0</div>
-                                <div class="stat-label">失败</div>
-                            </div>
-                            <div class="stat-item">
-                                <div id="stat-unavailable" class="stat-value warning">0</div>
-                                <div class="stat-label">下架</div>
-                            </div>
-                            <div class="stat-item">
-                                <div id="stat-total" class="stat-value muted">0</div>
-                                <div class="stat-label">已处理</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Column - Log -->
-            <div class="col-md-5">
-                <div class="md-card" style="height: calc(100vh - 120px);">
-                    <div class="md-card-header dark with-action">
-                        <span>
-                            <span class="material-icons">terminal</span>
-                            实时日志
-                        </span>
-                        <button id="btn-clear-log" class="md-btn-small">清空</button>
-                    </div>
-                    <div class="md-card-body log-body">
-                        <div class="log-container">
-                            <div id="log-entries"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+<!-- Main Layout -->
+<div class="app-layout">
+  <!-- Left Panel -->
+  <div class="panel-left">
+    <!-- Upload -->
+    <div class="sec-label fade-in fd1">上传文件</div>
+    <div id="upload-area" class="upload-zone fade-in fd1">
+      <svg class="brush-border" viewBox="0 0 230 90" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+        <path d="M3,3 Q5,1 18,2 L55,1 Q75,3 95,2 L135,1 Q155,3 175,2 L212,1 Q226,3 227,3 Q229,5 228,18 L227,45 Q229,60 228,75 L227,87 Q225,89 212,88 L175,89 Q155,87 135,88 L95,89 Q75,87 55,88 L18,89 Q5,87 3,87 Q1,85 2,72 L1,45 Q3,28 2,15Z"
+          fill="none" stroke="#2C2C2C" stroke-width="0.8" opacity="0.15" stroke-dasharray="5,3,2,3" stroke-linecap="round"/>
+      </svg>
+      <svg class="upload-icon-svg" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 4L14 18M8 10L14 4L20 10" stroke="#8A8578" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M4 18L4 22Q4 24 6 24L22 24Q24 24 24 22L24 18" stroke="#8A8578" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+      <div class="upload-hint"><strong>点击或拖拽上传</strong><br>.xlsx / .xls 文件</div>
+      <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none">
+    </div>
+    <div id="file-badge" class="file-badge">
+      <span id="file-badge-text" class="fname">-</span>
     </div>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- Socket.IO -->
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <!-- Actions -->
+    <div class="sec-gap"></div>
+    <div class="sec-label fade-in fd2">操作</div>
+    <div class="btn-group fade-in fd2">
+      <button id="btn-start" class="btn btn-primary" disabled>
+        <svg viewBox="0 0 13 13" fill="currentColor"><polygon points="3,1.5 11,6.5 3,11.5"/></svg>
+        开始爬取
+      </button>
+      <button id="btn-stop" class="btn btn-outline hidden">
+        <svg viewBox="0 0 13 13" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="0.5"/></svg>
+        停止
+      </button>
+      <button id="btn-retry" class="btn btn-amber hidden">
+        <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M1.5 6.5Q1.5 3 6.5 3L6.5 1.5L9 4.5L6.5 7.5L6.5 6Q3.5 6 3.5 8Q3.5 10 6.5 10"/></svg>
+        重试失败项
+      </button>
+      <button id="btn-download" class="btn btn-gold hidden">
+        <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M6.5 1.5L6.5 8.5M3 6L6.5 9.5L10 6"/><path d="M1.5 10L11.5 10"/></svg>
+        下载结果
+      </button>
+    </div>
 
-    <script>
-        // Socket.IO连接
-        const socket = io();
-        let uploadedFilePath = null;
-        let outputFileName = null;
+    <!-- Progress -->
+    <div class="sec-gap"></div>
+    <div id="progress-section" class="progress-box">
+      <div class="sec-label">进度</div>
+      <div class="prog-nums">
+        <span id="progress-text" class="prog-cur">0</span>
+        <span class="prog-div">/</span>
+        <span id="progress-total-num" class="prog-tot">0</span>
+        <span id="progress-percent" class="prog-pct">0%</span>
+      </div>
+      <div class="prog-track"><div id="progress-bar-fill" class="prog-fill"></div></div>
+      <div class="prog-current"><span id="current-url">等待开始...</span></div>
+    </div>
 
-        socket.on('connect', function() {
-            console.log('✓ 已连接到服务器');
-        });
+    <!-- Stats -->
+    <div id="stats-bar" class="stats-v">
+      <div class="stat-col s-ok"><span id="stat-success" class="sv">0</span><span class="sl">成功</span></div>
+      <div class="stat-col s-fail"><span id="stat-failed" class="sv">0</span><span class="sl">失败</span></div>
+      <div class="stat-col s-warn"><span id="stat-unavailable" class="sv">0</span><span class="sl">下架</span></div>
+      <div class="stat-col s-total"><span id="stat-total" class="sv">0</span><span class="sl">合计</span></div>
+    </div>
 
-        // 接收日志
-        socket.on('log', function(data) {
-            appendLog(data);
-        });
+    <!-- Done -->
+    <div class="sec-gap"></div>
+    <div id="completion-banner" class="done-banner">
+      <svg viewBox="0 0 14 14" stroke-linecap="round" stroke-linejoin="round"><path d="M13 6.5V7A6 6 0 1 1 9.4 1.5"/><polyline points="13 2.5 7 8.5 5.3 6.8"/></svg>
+      爬取完成
+    </div>
 
-        // 接收进度
-        socket.on('progress', function(data) {
-            if (data.percent !== undefined) {
-                updateProgress(data.percent, data.current, data.total);
-            }
-            if (data.current_url) {
-                document.getElementById('current-url').textContent = data.current_url;
-            }
-            if (data.statistics) {
-                updateStatistics(data.statistics);
-            }
-        });
+    <!-- Quick Check -->
+    <div class="sec-gap"></div>
+    <div class="sec-label fade-in fd3">快速查询</div>
+    <div class="qc-row fade-in fd3">
+      <input id="qc-input" class="qc-input" placeholder="商品ID 或 URL" spellcheck="false">
+      <button id="qc-btn" class="btn btn-outline" style="padding:7px 12px;font-size:0.78rem;letter-spacing:1px;border-color:var(--gold);color:var(--gold);">查询</button>
+    </div>
+    <div id="qc-result" class="qc-result">
+      <div class="qr"><span class="ql">商品</span><span id="qc-pid" class="qv">-</span></div>
+      <div class="qr"><span class="ql">原价</span><span id="qc-price" class="qv">-</span></div>
+      <div class="qr"><span class="ql">促销价</span><span id="qc-promo" class="qv">-</span></div>
+      <div class="qr"><span class="ql">状态</span><span id="qc-status" class="qv">-</span></div>
+    </div>
+  </div>
 
-        // 爬取完成
-        socket.on('crawl_complete', function(data) {
-            if (data.success) {
-                appendLog({
-                    timestamp: new Date().toLocaleTimeString(),
-                    level: 'INFO',
-                    message: '✓ 爬取完成！点击下载按钮获取结果'
-                });
-                outputFileName = data.output_file;
-                document.getElementById('btn-stop').style.display = 'none';
-                document.getElementById('btn-download').style.display = 'block';
-            } else {
-                appendLog({
-                    timestamp: new Date().toLocaleTimeString(),
-                    level: 'ERROR',
-                    message: '✗ 爬取失败: ' + data.error
-                });
-                document.getElementById('btn-stop').style.display = 'none';
-                document.getElementById('btn-start').style.display = 'block';
-            }
-        });
+  <!-- Right Panel -->
+  <div class="panel-right">
+    <!-- Tabs -->
+    <div class="tab-bar fade-in fd1">
+      <div class="tab-item active" data-tab="preview">数据预览<span id="preview-count" class="tc">0</span></div>
+      <div class="tab-item" data-tab="results">爬取结果<span id="results-count" class="tc">0</span></div>
+      <div class="tab-item" data-tab="log">运行日志<span id="log-count" class="tc">0</span></div>
+      <div class="tab-item" data-tab="history">历史记录</div>
+      <div class="tab-spacer"></div>
+      <button id="btn-clear-log" class="tab-action">清空日志</button>
+    </div>
 
-        // 文件上传
-        const uploadArea = document.getElementById('upload-area');
-        const fileInput = document.getElementById('file-input');
+    <div class="tab-content">
+      <!-- Preview -->
+      <div class="tab-pane active" id="pane-preview">
+        <div id="preview-empty" class="empty-state">
+          <svg viewBox="0 0 36 36" stroke-linecap="round" stroke-linejoin="round"><path d="M22 4H10a3 3 0 00-3 3v22a3 3 0 003 3h16a3 3 0 003-3V11z"/><polyline points="22 4 22 11 29 11"/></svg>
+          <div class="empty-text">上传文件后预览数据</div>
+        </div>
+        <div id="preview-table-wrap" class="table-wrap hidden">
+          <table class="data-table">
+            <thead><tr>
+              <th style="width:40px;text-align:center">#</th>
+              <th>品牌</th>
+              <th>Item</th>
+              <th>URL</th>
+              <th>Product Key</th>
+              <th style="text-align:right">Price Reference</th>
+            </tr></thead>
+            <tbody id="preview-tbody"></tbody>
+          </table>
+        </div>
+      </div>
 
-        uploadArea.addEventListener('click', () => fileInput.click());
+      <!-- Results -->
+      <div class="tab-pane" id="pane-results">
+        <div id="results-empty" class="empty-state">
+          <svg viewBox="0 0 36 36" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="14"/><polyline points="18 10 18 18 24 21"/></svg>
+          <div class="empty-text">爬取结果将在此处实时显示</div>
+        </div>
+        <div id="results-table-wrap" class="table-wrap hidden">
+          <svg class="ink-divider" viewBox="0 0 800 6" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0,3 Q20,1 50,3 T100,3 T150,2 T200,4 T250,3 T300,2 T350,4 T400,3 T450,2 T500,4 T550,3 T600,2 T650,4 T700,3 T750,2 T800,3" fill="none" stroke="#2C2C2C" stroke-width="1" stroke-linecap="round"/>
+          </svg>
+          <table class="data-table">
+            <thead><tr>
+              <th style="width:40px;text-align:center">#</th>
+              <th>品牌</th>
+              <th>Item</th>
+              <th>URL</th>
+              <th>状态</th>
+              <th style="text-align:right">原价</th>
+              <th style="text-align:right">促销价</th>
+              <th>时间</th>
+            </tr></thead>
+            <tbody id="results-tbody"></tbody>
+          </table>
+        </div>
+      </div>
 
-        fileInput.addEventListener('change', function(e) {
-            if (e.target.files.length > 0) {
-                uploadFile(e.target.files[0]);
-            }
-        });
+      <!-- Log -->
+      <div class="tab-pane" id="pane-log">
+        <div class="log-scroll" id="log-scroll">
+          <div id="log-entries">
+            <div id="log-empty" class="empty-state">
+              <svg viewBox="0 0 36 36" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 26 16 17 7 8"/><line x1="18" y1="28" x2="29" y2="28"/></svg>
+              <div class="empty-text">等待执行...</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
+      <!-- History -->
+      <div class="tab-pane" id="pane-history">
+        <div id="history-empty" class="empty-state">
+          <svg viewBox="0 0 36 36" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="14"/><polyline points="18 10 18 18 24 21"/></svg>
+          <div class="empty-text">加载历史记录...</div>
+        </div>
+        <div id="history-list" class="history-scroll hidden"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script>
+(() => {
+  const socket = io();
+  let uploadedFilePath = null;
+  let outputFileName = null;
+  let logCount = 0;
+  let resultCount = 0;
+  let failedCount = 0;
 
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            if (e.dataTransfer.files.length > 0) {
-                uploadFile(e.dataTransfer.files[0]);
-            }
-        });
+  const $ = id => document.getElementById(id);
+  const show = el => el.classList.remove('hidden');
+  const hide = el => el.classList.add('hidden');
 
-        function uploadFile(file) {
-            const formData = new FormData();
-            formData.append('file', file);
+  // Seal SVG for status badges
+  const sealOk = '<svg class="seal-mini" viewBox="0 0 11 11"><circle cx="5.5" cy="5.5" r="4.5" fill="none" stroke="#C23A2A" stroke-width="0.7" opacity="0.5"/><path d="M3 5.5L5 7.5L8 3.5" fill="none" stroke="#C23A2A" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const sealFail = '<svg class="seal-mini" viewBox="0 0 11 11"><circle cx="5.5" cy="5.5" r="4.5" fill="none" stroke="#8A8578" stroke-width="0.7" opacity="0.4"/><path d="M5.5 3V6.5M5.5 8V8" stroke="#8A8578" stroke-width="0.8" stroke-linecap="round"/></svg>';
+  const sealWarn = '<svg class="seal-mini" viewBox="0 0 11 11"><circle cx="5.5" cy="5.5" r="4.5" fill="none" stroke="#C4A265" stroke-width="0.7" opacity="0.5"/><path d="M3.5 3.5L7.5 7.5M7.5 3.5L3.5 7.5" stroke="#C4A265" stroke-width="0.7" stroke-linecap="round"/></svg>';
 
-            fetch('/api/upload', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    uploadedFilePath = data.filepath;
-                    document.getElementById('filename').textContent = data.filename;
-                    document.getElementById('url-count').textContent = data.url_count;
-                    document.getElementById('file-info').style.display = 'block';
-                    document.getElementById('btn-start').disabled = false;
-                }
-            })
-            .catch(err => console.error('Upload failed:', err));
+  // Tabs
+  document.querySelectorAll('.tab-item[data-tab]').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab-item[data-tab]').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      $('pane-' + tab.dataset.tab).classList.add('active');
+      if (tab.dataset.tab === 'history') loadHistory();
+    });
+  });
+
+  function switchTab(name) {
+    document.querySelectorAll('.tab-item[data-tab]').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelector(`.tab-item[data-tab="${name}"]`).classList.add('active');
+    $('pane-' + name).classList.add('active');
+  }
+
+  // Socket
+  socket.on('connect', () => { $('status-dot').classList.add('on'); $('status-text').textContent = '已连接'; });
+  socket.on('disconnect', () => { $('status-dot').classList.remove('on'); $('status-text').textContent = '已断开'; });
+  socket.on('log', data => appendLog(data));
+
+  socket.on('progress', data => {
+    if (data.percent !== undefined) {
+      $('progress-bar-fill').style.width = data.percent + '%';
+      $('progress-text').textContent = data.current;
+      $('progress-total-num').textContent = data.total;
+      $('progress-percent').textContent = Math.round(data.percent) + '%';
+    }
+    if (data.current_url) $('current-url').textContent = data.current_url;
+    if (data.statistics) {
+      $('stat-success').textContent = data.statistics.success;
+      $('stat-failed').textContent = data.statistics.failed;
+      $('stat-unavailable').textContent = data.statistics.unavailable;
+      $('stat-total').textContent = data.statistics.total;
+      failedCount = data.statistics.failed;
+    }
+  });
+
+  socket.on('result_row', row => addResultRow(row));
+
+  socket.on('crawl_complete', data => {
+    if (data.success) {
+      appendLog({ timestamp: now(), level: 'INFO', message: '爬取完成！' });
+      outputFileName = data.output_file;
+      hide($('btn-stop'));
+      show($('btn-download'));
+      $('completion-banner').classList.add('vis');
+      if (failedCount > 0) show($('btn-retry'));
+    } else {
+      appendLog({ timestamp: now(), level: 'ERROR', message: '爬取失败: ' + data.error });
+      hide($('btn-stop'));
+      show($('btn-start'));
+    }
+  });
+
+  // Quick check
+  socket.on('quick_check_status', data => {
+    $('qc-result').classList.add('vis');
+    $('qc-pid').textContent = data.product_id;
+    $('qc-status').textContent = data.status;
+    $('qc-status').className = 'qv';
+    $('qc-price').textContent = '...';
+    $('qc-promo').textContent = '...';
+  });
+
+  socket.on('quick_check_result', data => {
+    $('qc-result').classList.add('vis');
+    $('qc-pid').textContent = data.product_id;
+    if (data.success) {
+      $('qc-price').textContent = '\u00a5' + data.original_price;
+      $('qc-price').className = 'qv ok';
+      $('qc-promo').textContent = '\u00a5' + data.promo_price;
+      $('qc-promo').className = 'qv ok';
+      $('qc-status').textContent = '成功';
+      $('qc-status').className = 'qv ok';
+    } else {
+      $('qc-price').textContent = '-'; $('qc-price').className = 'qv err';
+      $('qc-promo').textContent = '-'; $('qc-promo').className = 'qv err';
+      $('qc-status').textContent = data.error || '错误';
+      $('qc-status').className = 'qv err';
+    }
+    $('qc-btn').disabled = false;
+    $('qc-btn').textContent = '查询';
+  });
+
+  // Upload
+  const uploadArea = $('upload-area');
+  const fileInput = $('file-input');
+  uploadArea.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => { if (e.target.files.length) uploadFile(e.target.files[0]); });
+  uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+  uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+  uploadArea.addEventListener('drop', e => {
+    e.preventDefault(); uploadArea.classList.remove('dragover');
+    if (e.dataTransfer.files.length) uploadFile(e.dataTransfer.files[0]);
+  });
+
+  function uploadFile(file) {
+    const fd = new FormData();
+    fd.append('file', file);
+    fetch('/api/upload', { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          uploadedFilePath = data.filepath;
+          uploadArea.classList.add('uploaded');
+          $('file-badge').classList.add('vis');
+          $('file-badge-text').textContent = `${data.filename} \u00b7 ${data.url_count} 个商品`;
+          $('btn-start').disabled = false;
+          loadPreview();
         }
+      })
+      .catch(err => console.error('Upload error:', err));
+  }
 
-        // 开始爬取
-        document.getElementById('btn-start').addEventListener('click', function() {
-            fetch('/api/crawl/start', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    filepath: uploadedFilePath,
-                    config: {}
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('btn-start').style.display = 'none';
-                    document.getElementById('btn-stop').style.display = 'block';
-                    document.getElementById('progress-section').style.display = 'block';
-                }
-            });
-        });
+  // Preview
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const dash = '<span style="color:var(--ink-faint)">—</span>';
 
-        // 停止爬取
-        document.getElementById('btn-stop').addEventListener('click', function() {
-            fetch('/api/crawl/stop', {method: 'POST'})
-            .then(() => {
-                document.getElementById('btn-start').style.display = 'block';
-                document.getElementById('btn-stop').style.display = 'none';
-            });
-        });
+  function loadPreview() {
+    fetch('/api/preview').then(r => r.json()).then(data => {
+      if (!data.success) return;
+      hide($('preview-empty'));
+      show($('preview-table-wrap'));
+      const tbody = $('preview-tbody');
+      tbody.innerHTML = '';
+      data.rows.forEach(row => {
+        const tr = document.createElement('tr');
+        const urlCell = row.url
+          ? `<a href="${esc(row.url)}" target="_blank" rel="noopener" title="${esc(row.url)}">${esc(row.url)}</a>`
+          : dash;
+        tr.innerHTML = `
+          <td class="col-idx">${row.index}</td>
+          <td class="col-brand">${row.brand ? esc(row.brand) : dash}</td>
+          <td class="col-item" title="${esc(row.item || '')}">${row.item ? esc(row.item) : dash}</td>
+          <td class="col-url">${urlCell}</td>
+          <td class="col-sku">${row.product_key ? esc(row.product_key) : dash}</td>
+          <td class="col-pref">${row.price_reference ? esc(row.price_reference) : dash}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+      $('preview-count').textContent = data.total;
+      switchTab('preview');
+    });
+  }
 
-        // 下载结果
-        document.getElementById('btn-download').addEventListener('click', function() {
-            if (outputFileName) {
-                window.location.href = `/api/download/${outputFileName}`;
-            }
-        });
+  // Results
+  function addResultRow(row) {
+    hide($('results-empty'));
+    show($('results-table-wrap'));
+    const tbody = $('results-tbody');
+    const tr = document.createElement('tr');
+    tr.style.animation = 'fadeUp 0.2s ease-out';
 
-        // 清空日志
-        document.getElementById('btn-clear-log').addEventListener('click', function() {
-            document.getElementById('log-entries').innerHTML = '';
-        });
+    const statusMap = {
+      success: `<span class="badge badge-ok">${sealOk}成功</span>`,
+      partial: `<span class="badge badge-warn">${sealWarn}部分</span>`,
+      failed: `<span class="badge badge-fail">${sealFail}失败</span>`,
+      blocked: `<span class="badge badge-block">${sealFail}被拦截</span>`,
+      forbidden: `<span class="badge badge-block">${sealFail}403</span>`,
+      not_found: `<span class="badge badge-warn">${sealWarn}未找到</span>`,
+      unavailable: `<span class="badge badge-warn">${sealWarn}已下架</span>`,
+    };
+    const badge = statusMap[row.status] || `<span class="badge badge-fail">${sealFail}未知</span>`;
+    const price = row.original_price && row.original_price !== '-'
+      ? `<span class="col-price">\u00a5${row.original_price}</span>` : '<span style="color:var(--ink-faint)">—</span>';
+    const promo = row.promo_price && row.promo_price !== '-'
+      ? `<span class="col-promo">\u00a5${row.promo_price}</span>` : '<span style="color:var(--ink-faint)">—</span>';
 
-        // 更新进度
-        function updateProgress(percent, current, total) {
-            const progressBar = document.getElementById('progress-bar-fill');
-            progressBar.style.width = percent + '%';
-            document.getElementById('progress-text').textContent = `进度: ${current} / ${total}`;
-            document.getElementById('progress-percent').textContent = percent + '%';
-        }
+    const urlCell = row.url
+      ? `<a href="${esc(row.url)}" target="_blank" rel="noopener" title="${esc(row.url)}">${esc(row.url)}</a>`
+      : dash;
+    tr.innerHTML = `
+      <td class="col-idx">${row.index}</td>
+      <td class="col-brand">${row.brand ? esc(row.brand) : dash}</td>
+      <td class="col-item" title="${esc(row.item || '')}">${row.item ? esc(row.item) : dash}</td>
+      <td class="col-url">${urlCell}</td>
+      <td>${badge}</td>
+      <td style="text-align:right">${price}</td>
+      <td style="text-align:right">${promo}</td>
+      <td class="col-time">${row.crawl_time || ''}</td>
+    `;
+    if (tbody.firstChild) tbody.insertBefore(tr, tbody.firstChild);
+    else tbody.appendChild(tr);
+    resultCount++;
+    $('results-count').textContent = resultCount;
+  }
 
-        // 更新统计
-        function updateStatistics(stats) {
-            document.getElementById('stat-success').textContent = stats.success;
-            document.getElementById('stat-failed').textContent = stats.failed;
-            document.getElementById('stat-unavailable').textContent = stats.unavailable;
-            document.getElementById('stat-total').textContent = stats.total;
-        }
+  // Actions
+  $('btn-start').addEventListener('click', () => {
+    fetch('/api/crawl/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filepath: uploadedFilePath, config: {} })
+    }).then(r => r.json()).then(data => {
+      if (data.success) {
+        hide($('btn-start')); show($('btn-stop'));
+        hide($('btn-retry')); hide($('btn-download'));
+        $('progress-section').classList.add('vis');
+        $('stats-bar').classList.add('vis');
+        $('completion-banner').classList.remove('vis');
+        resultCount = 0; failedCount = 0;
+        $('results-count').textContent = '0';
+        $('results-tbody').innerHTML = '';
+        clearLogEmpty();
+        switchTab('results');
+      }
+    });
+  });
 
-        // 添加日志
-        function appendLog(data) {
-            const logContainer = document.getElementById('log-entries');
-            const logEntry = document.createElement('div');
-            logEntry.className = 'log-entry';
+  $('btn-stop').addEventListener('click', () => {
+    fetch('/api/crawl/stop', { method: 'POST' }).then(() => { show($('btn-start')); hide($('btn-stop')); });
+  });
 
-            const levelClass = `log-level-${data.level}`;
-            logEntry.innerHTML = `
-                <span class="log-timestamp">[${data.timestamp}]</span>
-                <span class="${levelClass}">[${data.level}]</span>
-                <span class="log-message">${data.message}</span>
-            `;
+  $('btn-download').addEventListener('click', () => {
+    if (outputFileName) window.location.href = `/api/download/${outputFileName}`;
+  });
 
-            logContainer.insertBefore(logEntry, logContainer.firstChild);
+  $('btn-retry').addEventListener('click', () => {
+    fetch('/api/crawl/retry', { method: 'POST' }).then(r => r.json()).then(data => {
+      if (data.success) {
+        hide($('btn-retry')); hide($('btn-download')); hide($('btn-start')); show($('btn-stop'));
+        $('completion-banner').classList.remove('vis');
+        appendLog({ timestamp: now(), level: 'INFO', message: `正在重试 ${data.retry_count} 个失败项...` });
+      }
+    });
+  });
 
-            // 限制日志数量
-            while (logContainer.children.length > 200) {
-                logContainer.removeChild(logContainer.lastChild);
-            }
-        }
-    </script>
+  // Quick check
+  $('qc-btn').addEventListener('click', doQC);
+  $('qc-input').addEventListener('keydown', e => { if (e.key === 'Enter') doQC(); });
+  function doQC() {
+    const val = $('qc-input').value.trim();
+    if (!val) return;
+    $('qc-btn').disabled = true;
+    $('qc-btn').textContent = '...';
+    $('qc-result').classList.remove('vis');
+    fetch('/api/quick-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_id: val })
+    }).then(r => r.json()).then(data => {
+      if (!data.success) {
+        $('qc-btn').disabled = false;
+        $('qc-btn').textContent = '查询';
+        $('qc-result').classList.add('vis');
+        $('qc-pid').textContent = val;
+        $('qc-status').textContent = data.error;
+        $('qc-status').className = 'qv err';
+      }
+    });
+  }
+
+  // History
+  function loadHistory() {
+    fetch('/api/history').then(r => r.json()).then(data => {
+      if (!data.success || !data.files.length) {
+        $('history-empty').querySelector('.empty-text').textContent = '暂无历史记录';
+        return;
+      }
+      hide($('history-empty'));
+      show($('history-list'));
+      const list = $('history-list');
+      list.innerHTML = '';
+      data.files.forEach(f => {
+        const el = document.createElement('div');
+        el.className = 'history-row';
+        const kb = (f.size / 1024).toFixed(1);
+        const rows = f.row_count !== null ? ` \u00b7 ${f.row_count} 条` : '';
+        el.innerHTML = `<div><div class="history-name">${f.filename}</div><div class="history-meta">${f.modified} \u00b7 ${kb} KB${rows}</div></div><a class="history-dl" href="/api/download/${f.filename}">下载</a>`;
+        list.appendChild(el);
+      });
+    });
+  }
+
+  // Log
+  $('btn-clear-log').addEventListener('click', () => {
+    $('log-entries').innerHTML = '';
+    logCount = 0;
+    $('log-count').textContent = '0';
+  });
+
+  function clearLogEmpty() { const el = $('log-empty'); if (el) el.remove(); }
+
+  function appendLog(data) {
+    clearLogEmpty();
+    const el = document.createElement('div');
+    el.className = `log-line log-new lv-${data.level}`;
+    el.innerHTML = `<span class="lt">${data.timestamp}</span><span class="ll ${data.level}">${data.level}</span><span class="lm">${data.message}</span>`;
+    const entries = $('log-entries');
+    entries.insertBefore(el, entries.firstChild);
+    logCount++;
+    $('log-count').textContent = logCount;
+    while (entries.children.length > 300) entries.removeChild(entries.lastChild);
+  }
+
+  function now() { return new Date().toLocaleTimeString(); }
+})();
+</script>
 </body>
 </html>

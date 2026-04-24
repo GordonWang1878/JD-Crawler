@@ -14,6 +14,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 import subprocess
 import time
+import random
 import re
 import os
 import pickle
@@ -61,12 +62,13 @@ class JDCrawlerViaSearch:
 
             chrome_version = _detect_chrome_version()
             print(f"  正在初始化浏览器... (Chrome v{chrome_version or '?'})")
+            t0 = time.time()
             self.driver = uc.Chrome(
                 options=options,
                 version_main=chrome_version,
-                use_subprocess=False,
             )
             self.driver.implicitly_wait(5)
+            print(f"  ✓ 浏览器启动成功 ({time.time()-t0:.1f}秒)")
         except Exception as e:
             print(f"初始化驱动失败: {str(e)}")
             raise
@@ -185,6 +187,40 @@ class JDCrawlerViaSearch:
             print(f"✗ 保存cookies失败: {e}")
             return False
 
+    def warmup(self):
+        """登录后模拟正常浏览行为，降低反爬风险"""
+        print("  热身：模拟正常浏览...")
+        try:
+            # 1. 浏览京东首页
+            self.driver.get("https://www.jd.com")
+            time.sleep(random.uniform(3, 5))
+            self.driver.execute_script("window.scrollTo(0, 600);")
+            time.sleep(random.uniform(1, 2))
+            self.driver.execute_script("window.scrollTo(0, 0);")
+            time.sleep(random.uniform(1, 2))
+
+            # 2. 搜索一个热门关键词
+            self.driver.get("https://search.jd.com/Search?keyword=充电宝&enc=utf-8")
+            time.sleep(random.uniform(3, 5))
+            self.driver.execute_script("window.scrollTo(0, 800);")
+            time.sleep(random.uniform(2, 3))
+            self.driver.execute_script("window.scrollTo(0, 1500);")
+            time.sleep(random.uniform(1, 2))
+
+            # 3. 点进一个商品看看（用热门商品）
+            self.driver.get("https://item.jd.com/100015253059.html")
+            time.sleep(random.uniform(3, 5))
+            self.driver.execute_script("window.scrollTo(0, 500);")
+            time.sleep(random.uniform(2, 3))
+
+            # 4. 回到首页
+            self.driver.get("https://www.jd.com")
+            time.sleep(random.uniform(2, 3))
+
+            print("  ✓ 热身完成")
+        except Exception as e:
+            print(f"  热身出错（忽略）: {e}")
+
     def get_price_via_search(self, product_id: str) -> Optional[float]:
         """
         获取商品价格（直接访问，避免搜索触发验证）
@@ -202,7 +238,16 @@ class JDCrawlerViaSearch:
 
             print(f"  直接访问商品页...")
             self.driver.get(product_url)
-            time.sleep(2.5)  # 等待页面加载（优化后：4s→3s→2.5s）
+            # 等待页面加载 — 随机化避免被检测
+            time.sleep(random.uniform(3.5, 5.0))
+
+            # 模拟人类行为：滚动页面触发懒加载
+            try:
+                self.driver.execute_script("window.scrollTo(0, 300);")
+                time.sleep(0.5)
+                self.driver.execute_script("window.scrollTo(0, 0);")
+            except:
+                pass
 
             # 检查当前URL - 精确区分不同的失败类型
             current_url = self.driver.current_url
@@ -217,10 +262,14 @@ class JDCrawlerViaSearch:
                 print(f"  ⚠️  403错误 - 反爬拦截 (可重试)")
                 return {'original': 'forbidden', 'promo': 'forbidden'}
 
-            # 3. 检查是否被重定向到首页（商品不存在）
+            # 3. 被重定向到首页 — 精确区分"商品不存在"和"反爬拦截"
             if current_url.startswith("https://www.jd.com/?") or current_url == "https://www.jd.com/":
-                print(f"  ⚠️  被重定向到首页 - 商品不存在")
-                return {'original': 'not_found', 'promo': 'not_found'}
+                # ?d 是商品不存在/已失效的特征参数（终态，不重试）
+                if current_url == "https://www.jd.com/?d":
+                    print(f"  ✗ 商品不存在或链接失效")
+                    return {'original': 'not_found', 'promo': 'not_found'}
+                print(f"  ⚠️  被重定向到首页 (可重试)")
+                return {'original': 'blocked', 'promo': 'blocked'}
 
             # 检查商品是否已下架
             page_text = self.driver.page_source
@@ -256,340 +305,180 @@ class JDCrawlerViaSearch:
             print(f"  ✗ 错误: {e}")
             return None
 
+    def _debug_page_prices(self):
+        """诊断页面上的价格相关元素"""
+        try:
+            debug_js = """
+            var info = {url: window.location.href, title: document.title};
+
+            // 搜索所有包含 ¥ 或价格数字的元素
+            var allElements = document.querySelectorAll('*');
+            var priceElements = [];
+            for (var i = 0; i < allElements.length; i++) {
+                var el = allElements[i];
+                // 只检查叶子节点或直接包含价格文本的元素
+                var text = '';
+                for (var j = 0; j < el.childNodes.length; j++) {
+                    if (el.childNodes[j].nodeType === 3) {
+                        text += el.childNodes[j].textContent;
+                    }
+                }
+                text = text.trim();
+                if (text && /[¥￥]\\s*\\d+|^\\d+\\.\\d{2}$/.test(text)) {
+                    priceElements.push({
+                        tag: el.tagName,
+                        class: el.className || '',
+                        id: el.id || '',
+                        text: text.substring(0, 80),
+                        parentClass: el.parentElement ? (el.parentElement.className || '') : '',
+                        parentId: el.parentElement ? (el.parentElement.id || '') : ''
+                    });
+                }
+            }
+            info.priceElements = priceElements.slice(0, 20);
+
+            // 检查已知的价格容器是否存在
+            var knownSelectors = [
+                '.p-price', '.p-price .price', '#summary-price',
+                '.summary-price', '.price-plus', '.J-p-price',
+                '.dd .price', '.price-box', '.itemInfo-wrap .price',
+                '[class*="price"]', '[class*="Price"]'
+            ];
+            info.selectorResults = {};
+            for (var k = 0; k < knownSelectors.length; k++) {
+                var sel = knownSelectors[k];
+                var found = document.querySelectorAll(sel);
+                if (found.length > 0) {
+                    var texts = [];
+                    for (var m = 0; m < Math.min(found.length, 3); m++) {
+                        texts.push(found[m].textContent.trim().substring(0, 100));
+                    }
+                    info.selectorResults[sel] = {count: found.length, texts: texts};
+                }
+            }
+
+            return info;
+            """
+            result = self.driver.execute_script(debug_js)
+            print(f"  [诊断] URL: {result.get('url', '?')}")
+            print(f"  [诊断] Title: {result.get('title', '?')}")
+
+            selectors = result.get('selectorResults', {})
+            if selectors:
+                print(f"  [诊断] 匹配的选择器:")
+                for sel, data in selectors.items():
+                    print(f"    {sel}: {data['count']}个, 内容: {data['texts']}")
+            else:
+                print(f"  [诊断] ⚠️ 没有匹配任何已知价格选择器!")
+
+            price_els = result.get('priceElements', [])
+            if price_els:
+                print(f"  [诊断] 找到{len(price_els)}个含价格文本的元素:")
+                for pe in price_els[:10]:
+                    print(f"    <{pe['tag']} class='{pe['class']}' id='{pe['id']}'> {pe['text']}")
+                    print(f"      父级: class='{pe['parentClass']}' id='{pe['parentId']}'")
+            else:
+                print(f"  [诊断] ⚠️ 页面上没找到任何含 ¥ 的元素!")
+
+        except Exception as e:
+            print(f"  [诊断] 出错: {e}")
+
     def _extract_price(self) -> Optional[dict]:
         """
-        从当前页面提取价格（包括原价和促销价）
-
-        支持多种价格标注：
-        - 日常价（原价）
-        - 到手价（促销价）
-        - 补贴价（促销价）
-        - 删除线价格（原价）
+        从当前页面提取价格（适配京东2025/2026新版页面）
 
         Returns:
             字典格式: {'original': float, 'promo': float} 或 None
         """
         try:
-            time.sleep(1.0)  # 等待价格加载（优化后：2s→1.5s→1s）
+            time.sleep(1.0)
 
             prices = {
                 'original': None,
                 'promo': None
             }
 
-            # 使用 JavaScript 针对京东特定的价格区域提取
+            # 适配京东新版页面结构（2025/2026）
+            # 主价格: .product-price--value (当前售价)
+            # 灰色原价: .product-price--gray 内的 ¥ 文本
+            # 备用: .calculator-product-info .product-price
             js_script = """
-            var results = [];
+            var result = {main: null, gray: null, fallback: null};
 
-            // 新方案：使用超精确的选择器，只抓商品主价格
-            // 不用通用的.price/.dd（会抓到附加服务、保险等）
-            // 不用容器本身（如.p-price），只用子元素
-            var priceSelectors = [
-                '.p-price .price',              // 主价格区域内的价格
-                '.p-price del',                 // 主价格区域内的删除线
-                '#summary-price .price',        // 价格汇总内的价格
-                '#summary-price del',           // 价格汇总内的删除线
-                '.summary-price .price',        // 价格摘要内的价格
-                '.summary-price del',           // 价格摘要内的删除线
-                // 移除容器本身（.p-price），避免重复抓取
-            ];
+            // 1. 主价格: product-price--value (当前售价/促销价)
+            var mainEl = document.querySelector('.product-price--value');
+            if (mainEl) {
+                var m = mainEl.textContent.trim().match(/([\\.\\d]+)/);
+                if (m) result.main = parseFloat(m[1]);
+            }
 
-            var allPriceElements = [];
-            for (var s = 0; s < priceSelectors.length; s++) {
-                var elems = document.querySelectorAll(priceSelectors[s]);
-                for (var e = 0; e < elems.length; e++) {
-                    allPriceElements.push(elems[e]);
+            // 2. 灰色价格: product-price--gray (原价/日常价)
+            var grayEl = document.querySelector('.product-price--gray');
+            if (grayEl) {
+                var g = grayEl.textContent.trim().match(/[¥￥]\\s*([\\.\\d]+)/);
+                if (g) result.gray = parseFloat(g[1]);
+            }
+
+            // 3. 备用: calculator-product-info 内的 product-price
+            if (!result.main) {
+                var calcEl = document.querySelector('.calculator-product-info .product-price');
+                if (calcEl) {
+                    var c = calcEl.textContent.trim().match(/[¥￥]\\s*([\\.\\d]+)/);
+                    if (c) result.fallback = parseFloat(c[1]);
                 }
             }
 
-            for (var i = 0; i < allPriceElements.length; i++) {
-                var elem = allPriceElements[i];
-                var text = (elem.textContent || elem.innerText || '').trim();
-
-                // 匹配价格：可以有或没有 ¥ 符号，小数点可选
-                var priceMatch = text.match(/[¥￥]?\\s*(\\d+(?:\\.\\d{1,2})?)/);
-
-                if (priceMatch && priceMatch[1]) {
-                    var price = parseFloat(priceMatch[1]);
-
-                    // 价格在合理范围内
-                    if (price >= 10 && price <= 10000) {
-                        // 获取完整的上下文
-                        var context = text;
-                        var parent = elem.parentElement;
-                        if (parent) {
-                            context = (parent.textContent || '').substring(0, 150);
-                        }
-
-                        // 排除明显不是商品价格的元素
-                        // 注意：不能用单字"日"，会误杀"日常价"
-                        var skipKeywords = ['积分', '优惠券', '满减', '津贴', '红包', '库存', '评价', '已购', '运费', '邮费',
-                                          '月日', '时:', '分:', '点:', '前付', 'mAh', 'MAH', '毫安', '容量', '送达',
-                                          '功率', 'W大', 'W快', 'W闪', '颜色', '版本', '规格', '限时达', '京准达', '物流'];
-                        var shouldSkip = false;
-
-                        // 检查是否包含日期时间格式（如"12月11日"、"19:30"）
-                        if (/\d+月/.test(context) || /\d+:\d+/.test(context) || /\d+分钟/.test(context)) {
-                            shouldSkip = true;
-                        }
-
-                        if (!shouldSkip) {
-                            for (var j = 0; j < skipKeywords.length; j++) {
-                                if (context.indexOf(skipKeywords[j]) >= 0) {
-                                    shouldSkip = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (!shouldSkip) {
-                            // 检查是否有删除线（标签或CSS样式）
-                            var hasStrikethrough = false;
-
-                            // 方法1：检查是否是<del>标签
-                            if (elem.tagName === 'DEL') {
-                                hasStrikethrough = true;
-                            }
-
-                            // 方法2：检查是否在<del>标签内
-                            if (!hasStrikethrough && elem.closest && elem.closest('del')) {
-                                hasStrikethrough = true;
-                            }
-
-                            // 方法3：检查CSS样式
-                            if (!hasStrikethrough) {
-                                var computedStyle = window.getComputedStyle(elem);
-                                if (computedStyle.textDecoration && computedStyle.textDecoration.includes('line-through')) {
-                                    hasStrikethrough = true;
-                                }
-                            }
-
-                            results.push({
-                                price: price,
-                                text: text,
-                                context: context,
-                                tagName: elem.tagName,
-                                className: elem.className || '',
-                                parentClassName: parent ? (parent.className || '') : '',
-                                isDel: hasStrikethrough
-                            });
-                        }
-                    }
+            // 4. 再备用: 页面上第一个 product-price 容器
+            if (!result.main && !result.fallback) {
+                var ppEl = document.querySelector('.product-price');
+                if (ppEl) {
+                    var p = ppEl.textContent.match(/[¥￥]\\s*([\\.\\d]+)/);
+                    if (p) result.fallback = parseFloat(p[1]);
                 }
             }
 
-            return results;
+            // 5. 旧版兼容: .p-price .price
+            if (!result.main && !result.fallback) {
+                var oldEl = document.querySelector('.p-price .price');
+                if (oldEl) {
+                    var o = oldEl.textContent.trim().match(/([\\.\\d]+)/);
+                    if (o) result.fallback = parseFloat(o[1]);
+                }
+            }
+
+            return result;
             """
 
-            # 执行 JavaScript 获取所有价格候选
-            all_prices = self.driver.execute_script(js_script)
+            data = self.driver.execute_script(js_script)
 
-            if not all_prices:
-                print(f"  未找到任何价格候选")
+            if not data:
+                print(f"  未找到任何价格元素")
                 return None
 
-            print(f"  找到 {len(all_prices)} 个价格候选")
+            main_price = data.get('main')
+            gray_price = data.get('gray')
+            fallback_price = data.get('fallback')
 
-            # 调试：显示所有候选价格（含详细信息）
-            if len(all_prices) <= 15:
-                for idx, item in enumerate(all_prices, 1):
-                    context_preview = item['context'][:50] if len(item['context']) > 50 else item['context']
-                    del_mark = " [删除线]" if item.get('isDel', False) else ""
-                    tag = item.get('tagName', '')
-                    cls = item.get('className', '')
-                    print(f"    候选{idx}: ¥{item['price']}{del_mark}")
-                    print(f"           标签:{tag} 类:{cls}")
-                    print(f"           上下文: {context_preview}")
+            print(f"  价格数据: 主价={main_price}, 灰色={gray_price}, 备用={fallback_price}")
 
-            # 去重：相同价格优先保留有明确标注的（删除线、关键词等）
-            unique_prices = {}
-            for item in all_prices:
-                price = item['price']
-                if price not in unique_prices:
-                    # 第一次遇到这个价格，直接保存
-                    unique_prices[price] = item
+            # 确定当前售价
+            current_price = main_price or fallback_price
+
+            if current_price:
+                if gray_price and gray_price > current_price:
+                    prices['original'] = gray_price
+                    prices['promo'] = current_price
+                    print(f"  ✓ 原价: ¥{gray_price}, 当前价: ¥{current_price}")
                 else:
-                    # 已存在这个价格，优先保留有删除线或关键词标注的
-                    existing = unique_prices[price]
-                    # 如果新的有删除线，旧的没有，替换
-                    if item.get('isDel', False) and not existing.get('isDel', False):
-                        unique_prices[price] = item
-                    # 如果新的上下文包含价格关键词，旧的没有，替换
-                    elif any(kw in item.get('context', '') for kw in ['日常价', '原价', '到手价', '补贴价', '划线价']):
-                        if not any(kw in existing.get('context', '') for kw in ['日常价', '原价', '到手价', '补贴价', '划线价']):
-                            unique_prices[price] = item
-
-            all_prices = list(unique_prices.values())
-
-            # 智能识别价格类型
-            # 第一步：收集所有匹配关键词的价格
-            original_candidates = []  # 原价候选
-            promo_candidates = []      # 促销价候选
-
-            for item in all_prices:
-                price = item['price']
-                context = item['context']
-                text = item['text']
-                is_del = item['isDel']
-                class_name = item.get('className', '')
-                parent_class = item.get('parentClassName', '')
-
-                # 原价关键词
-                if any(keyword in context for keyword in ['日常价', '市场价', '原价', '划线价']):
-                    original_candidates.append((price, '日常价/原价', item))
-                # 删除线也是原价
-                elif is_del:
-                    original_candidates.append((price, '删除线', item))
-
-                # 促销价关键词（检查更精确的上下文）
-                if '到手价' in context or '到手价' in text:
-                    promo_candidates.append((price, '到手价', item))
-                elif '补贴价' in context or '补贴价' in text:
-                    promo_candidates.append((price, '补贴价', item))
-                elif any(keyword in context for keyword in ['秒杀价', '抢购价', '促销价', '券后']):
-                    promo_candidates.append((price, '促销标注', item))
-
-            # 第二步：从候选中选择最佳价格
-            # 原价：如果有多个候选，选择较大的
-            if original_candidates:
-                # 按价格降序排序，取最大的
-                original_candidates.sort(key=lambda x: x[0], reverse=True)
-                prices['original'] = original_candidates[0][0]
-                print(f"  找到原价: ¥{prices['original']} (标注: {original_candidates[0][1]})")
-
-            # 促销价：如果有多个候选，选择较小的（且不能太小）
-            if promo_candidates:
-                # 过滤掉明显太小的价格（<= 20，可能是优惠金额）
-                valid_promo = [c for c in promo_candidates if c[0] > 20]
-                if valid_promo:
-                    # 按价格升序排序，取最小的
-                    valid_promo.sort(key=lambda x: x[0])
-                    prices['promo'] = valid_promo[0][0]
-                    print(f"  找到促销价: ¥{prices['promo']} (标注: {valid_promo[0][1]})")
-
-            # 第三步：如果没有通过关键词找到，尝试 class
-            if not prices['promo']:
-                for item in all_prices:
-                    price = item['price']
-                    class_name = item.get('className', '')
-                    parent_class = item.get('parentClassName', '')
-                    if 'price' in class_name.lower() or 'price' in parent_class.lower():
-                        if not prices['promo'] and price > 20:
-                            prices['promo'] = price
-                            print(f"  找到促销价: ¥{price} (price class)")
-                            break
-
-            # 第四步：如果通过关键词没找全，使用价格大小判断
-            if all_prices and (not prices['original'] or not prices['promo']):
-                # 按价格排序
-                sorted_prices = sorted([item['price'] for item in all_prices])
-
-                # 特殊情况：如果已有促销价但无原价，找比促销价大的候选
-                if prices['promo'] and not prices['original']:
-                    # 先尝试找有删除线或明确标注的原价
-                    larger_items = [item for item in all_prices if item['price'] > prices['promo']]
-
-                    # 优先选择有删除线的
-                    del_items = [item for item in larger_items if item.get('isDel', False)]
-                    if del_items:
-                        # 如果有多个删除线价格，选择最大的
-                        del_items.sort(key=lambda x: x['price'], reverse=True)
-                        prices['original'] = del_items[0]['price']
-                        print(f"  找到原价: ¥{prices['original']} (删除线标注)")
-                    else:
-                        # 没有删除线，选择比促销价大的最大值（原价通常是最高的）
-                        larger_prices = [item['price'] for item in larger_items]
-                        if larger_prices:
-                            prices['original'] = max(larger_prices)
-                            print(f"  找到原价: ¥{prices['original']} (比促销价大的最大值)")
-                # 特殊情况：如果已有原价但无促销价，找比原价小的候选
-                elif prices['original'] and not prices['promo']:
-                    smaller_prices = [p for p in sorted_prices if p < prices['original'] and p > 20]
-                    if smaller_prices:
-                        # 选择比原价小的最大值作为促销价
-                        prices['promo'] = max(smaller_prices)
-                        print(f"  找到促销价: ¥{prices['promo']} (比原价小的最大值)")
-                    else:
-                        prices['promo'] = prices['original']
-                        print(f"  无促销，使用原价")
-                # 都没有：使用原来的逻辑
-                elif len(sorted_prices) <= 5:
-                    # 如果只有一个价格
-                    if len(sorted_prices) == 1:
-                        price = sorted_prices[0]
-                        if not prices['promo']:
-                            prices['promo'] = price
-                            print(f"  找到价格: ¥{price} (仅一个价格)")
-                        if not prices['original']:
-                            prices['original'] = price
-                    # 如果有2-5个价格
-                    elif 2 <= len(sorted_prices) <= 5:
-                        # 取最小和最大的两个（通常是促销价和原价）
-                        min_price = sorted_prices[0]
-                        max_price = sorted_prices[-1]
-
-                        # 如果两个价格不同，且差异合理（不超过2倍）
-                        if min_price != max_price and max_price <= min_price * 2:
-                            if not prices['promo']:
-                                prices['promo'] = min_price
-                                print(f"  找到促销价: ¥{min_price} (最低价)")
-                            if not prices['original']:
-                                prices['original'] = max_price
-                                print(f"  找到原价: ¥{max_price} (最高价)")
-                        # 如果价格差异太大，只用最小价格
-                        elif min_price != max_price:
-                            if not prices['promo']:
-                                prices['promo'] = min_price
-                                print(f"  找到价格: ¥{min_price} (价格差异过大，只取最小值)")
-                            if not prices['original']:
-                                prices['original'] = min_price
-                        # 如果只有一个价格值（多个元素显示相同价格）
-                        else:
-                            if not prices['promo']:
-                                prices['promo'] = min_price
-                                print(f"  找到价格: ¥{min_price}")
-                            if not prices['original']:
-                                prices['original'] = min_price
-                else:
-                    print(f"  ⚠️  价格候选过多({len(sorted_prices)}个)，跳过大小判断")
-
-            # 最终价格验证和处理
-            # 1. 处理只找到一个价格的情况
-            if prices['promo'] and not prices['original']:
-                # 只找到促销价，但商品一定有常规价格
-                # 这个价格很可能就是常规价格，只是提取位置判断错误
-                print(f"  只找到一个价格(在促销位置)，视为常规价格")
-                prices['original'] = prices['promo']
-                # 促销价保持不变，表示当前售价
-            elif prices['original'] and not prices['promo']:
-                # 只找到原价，说明没有促销活动
-                print(f"  只找到原价，无促销活动，使用相同价格")
-                prices['promo'] = prices['original']
-
-            # 2. 最终价格验证
-            if prices['original'] or prices['promo']:
-                # 验证价格合理性
-                original = prices['original']
-                promo = prices['promo']
-
-                # 价格必须在合理范围内 (10-100000)
-                if original and (original < 10 or original > 100000):
-                    print(f"  ⚠️  原价异常: ¥{original}，忽略")
-                    prices['original'] = None
-
-                if promo and (promo < 10 or promo > 100000):
-                    print(f"  ⚠️  促销价异常: ¥{promo}，忽略")
-                    prices['promo'] = None
-
-                # 如果促销价 > 原价，说明识别错误，交换
-                if prices['original'] and prices['promo']:
-                    if prices['promo'] > prices['original']:
-                        print(f"  ⚠️  促销价(¥{prices['promo']})高于原价(¥{prices['original']})，交换")
-                        prices['original'], prices['promo'] = prices['promo'], prices['original']
-
-                # 返回结果
-                if prices['promo'] or prices['original']:
-                    return prices
+                    prices['original'] = current_price
+                    prices['promo'] = current_price
+                    print(f"  ✓ 价格: ¥{current_price} (无促销)")
+                return prices
+            elif gray_price:
+                prices['original'] = gray_price
+                prices['promo'] = gray_price
+                print(f"  ✓ 仅灰色价格: ¥{gray_price}")
+                return prices
 
             print(f"  未找到有效价格")
             return None
