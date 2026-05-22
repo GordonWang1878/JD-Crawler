@@ -15,7 +15,11 @@ Flask-SQLAlchemy==3.1.1
 openpyxl==3.1.2
 pandas==2.1.4
 
-# 现有爬虫依赖
+# 京东爬虫(patchright 版,主) — 反检测 Playwright fork
+# 安装后还需运行: patchright install chromium
+patchright>=1.59.0
+
+# 天猫爬虫 + 旧京东 selenium 版(已被 patchright 取代,保留作 fallback)
 selenium==4.16.0
 undetected-chromedriver==3.5.4
 urllib3==2.1.0

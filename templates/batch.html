@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>京东价格爬虫</title>
+<title>电商价格爬虫</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&family=Noto+Sans+SC:wght@300;400;500;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
@@ -218,6 +218,54 @@ body {
   font-weight: 500;
 }
 
+/* Platform tabs (top of left panel) */
+.platform-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 14px;
+  border-bottom: 1px solid rgba(44,44,44,0.12);
+  position: relative;
+}
+.platform-tab {
+  flex: 1;
+  text-align: center;
+  font-family: var(--font-title);
+  font-size: 0.92rem;
+  padding: 8px 4px;
+  cursor: pointer;
+  color: var(--ink-faint);
+  letter-spacing: 2px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  position: relative;
+  user-select: none;
+}
+.platform-tab:hover { color: var(--ink-light); }
+.platform-tab.active { color: var(--ink); border-bottom-color: var(--cinnabar); }
+.platform-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: var(--cinnabar);
+  border-radius: 50%;
+}
+.platform-badge {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 0.66rem;
+  padding: 1px 5px;
+  border-radius: 2px;
+  letter-spacing: 0;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.platform-badge-jd { color: #E1251B; background: rgba(225,37,27,0.08); border: 1px solid rgba(225,37,27,0.2); }
+.platform-badge-tmall { color: #FF5000; background: rgba(255,80,0,0.08); border: 1px solid rgba(255,80,0,0.2); }
+
 /* File badge */
 .file-badge {
   display: none;
@@ -231,6 +279,28 @@ body {
 }
 .file-badge.vis { display: block; animation: fadeUp 0.3s ease-out; }
 .file-badge .fname { font-weight: 500; color: var(--ink); }
+
+/* Template download link */
+.template-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  text-decoration: none;
+  letter-spacing: 1px;
+  padding: 4px 8px;
+  border-bottom: 1px dotted rgba(196,162,101,0.4);
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+  transition: color 0.2s, border-color 0.2s;
+  cursor: pointer;
+}
+.template-link:hover { color: var(--gold); border-bottom-color: var(--gold); }
+.template-link svg { width: 11px; height: 11px; flex-shrink: 0; }
 
 @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
 
@@ -640,7 +710,7 @@ body {
       </svg>
     </div>
     <div class="title-group">
-      <h1>京东价格爬虫</h1>
+      <h1>电商价格爬虫</h1>
       <div class="title-sub">批量价格采集工具</div>
     </div>
   </div>
@@ -657,6 +727,12 @@ body {
 <div class="app-layout">
   <!-- Left Panel -->
   <div class="panel-left">
+    <!-- Platform tabs -->
+    <div class="platform-tabs fade-in">
+      <div class="platform-tab active" data-platform="jd">京东</div>
+      <div class="platform-tab" data-platform="tmall">天猫淘宝</div>
+    </div>
+
     <!-- Upload -->
     <div class="sec-label fade-in fd1">上传文件</div>
     <div id="upload-area" class="upload-zone fade-in fd1">
@@ -674,6 +750,13 @@ body {
     <div id="file-badge" class="file-badge">
       <span id="file-badge-text" class="fname">-</span>
     </div>
+    <a id="template-link" class="template-link" href="/api/template" download title="下载标准格式的 Excel 模板">
+      <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6.5 1.5 L6.5 8.5 M3 6 L6.5 9.5 L10 6"/>
+        <path d="M2 11 L11 11"/>
+      </svg>
+      下载模板
+    </a>
 
     <!-- Actions -->
     <div class="sec-gap"></div>
@@ -767,7 +850,7 @@ body {
               <th>品牌</th>
               <th>Item</th>
               <th>URL</th>
-              <th>Product Key</th>
+              <th id="preview-id-col">Product Key</th>
               <th style="text-align:right">Price Reference</th>
             </tr></thead>
             <tbody id="preview-tbody"></tbody>
@@ -788,6 +871,7 @@ body {
           <table class="data-table">
             <thead><tr>
               <th style="width:40px;text-align:center">#</th>
+              <th style="width:54px">平台</th>
               <th>品牌</th>
               <th>Item</th>
               <th>URL</th>
@@ -829,22 +913,93 @@ body {
 <script>
 (() => {
   const socket = io();
-  let uploadedFilePath = null;
-  let outputFileName = null;
+
+  // ===== 平台状态 =====
+  let currentPlatform = 'jd';
+  const API = {
+    jd: {
+      upload: '/api/upload', preview: '/api/preview', template: '/api/template',
+      crawlStart: '/api/crawl/start', crawlRetry: '/api/crawl/retry',
+      idColLabel: 'Product Key', idField: 'product_key', label: '京东',
+    },
+    tmall: {
+      upload: '/api/tmall/upload', preview: '/api/tmall/preview', template: '/api/tmall/template',
+      crawlStart: '/api/tmall/crawl/start', crawlRetry: '/api/tmall/crawl/retry',
+      idColLabel: 'Product Key', idField: 'product_key', label: '天猫',
+    },
+  };
+  const api = () => API[currentPlatform];
+
+  // 每个平台独立的"已上传文件 + 输出文件名 + 失败计数"
+  const platformState = {
+    jd:    { uploadedFilePath: null, outputFileName: null, failedCount: 0 },
+    tmall: { uploadedFilePath: null, outputFileName: null, failedCount: 0 },
+  };
+  const ps = () => platformState[currentPlatform];
+
   let logCount = 0;
   let resultCount = 0;
-  let failedCount = 0;
 
   const $ = id => document.getElementById(id);
   const show = el => el.classList.remove('hidden');
   const hide = el => el.classList.add('hidden');
+
+  const platformBadge = p => p === 'tmall'
+    ? '<span class="platform-badge platform-badge-tmall">天猫</span>'
+    : '<span class="platform-badge platform-badge-jd">京东</span>';
 
   // Seal SVG for status badges
   const sealOk = '<svg class="seal-mini" viewBox="0 0 11 11"><circle cx="5.5" cy="5.5" r="4.5" fill="none" stroke="#C23A2A" stroke-width="0.7" opacity="0.5"/><path d="M3 5.5L5 7.5L8 3.5" fill="none" stroke="#C23A2A" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const sealFail = '<svg class="seal-mini" viewBox="0 0 11 11"><circle cx="5.5" cy="5.5" r="4.5" fill="none" stroke="#8A8578" stroke-width="0.7" opacity="0.4"/><path d="M5.5 3V6.5M5.5 8V8" stroke="#8A8578" stroke-width="0.8" stroke-linecap="round"/></svg>';
   const sealWarn = '<svg class="seal-mini" viewBox="0 0 11 11"><circle cx="5.5" cy="5.5" r="4.5" fill="none" stroke="#C4A265" stroke-width="0.7" opacity="0.5"/><path d="M3.5 3.5L7.5 7.5M7.5 3.5L3.5 7.5" stroke="#C4A265" stroke-width="0.7" stroke-linecap="round"/></svg>';
 
-  // Tabs
+  // ===== 平台 tab 切换 =====
+  document.querySelectorAll('.platform-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const p = tab.dataset.platform;
+      if (p === currentPlatform) return;
+      switchPlatform(p);
+    });
+  });
+
+  function switchPlatform(p) {
+    currentPlatform = p;
+    document.querySelectorAll('.platform-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.platform === p);
+    });
+    $('template-link').href = api().template;
+    $('preview-id-col').textContent = api().idColLabel;
+    const s = ps();
+    if (s.uploadedFilePath) {
+      $('btn-start').disabled = false;
+    } else {
+      $('btn-start').disabled = true;
+      hide($('file-badge').classList ? $('file-badge') : document.createElement('div'));
+    }
+    // 切平台后,根据新平台的已上传状态刷新文件 badge 显示
+    refreshFileBadge();
+    loadPreview();
+    // 快速查询区域:天猫不支持
+    const qcRow = document.querySelector('.qc-row');
+    if (qcRow) {
+      qcRow.style.opacity = p === 'tmall' ? '0.35' : '';
+      qcRow.style.pointerEvents = p === 'tmall' ? 'none' : '';
+    }
+  }
+
+  function refreshFileBadge() {
+    const s = ps();
+    if (s.uploadedFilePath && s.fileBadgeText) {
+      $('file-badge').classList.add('vis');
+      $('file-badge-text').textContent = s.fileBadgeText;
+      $('upload-area').classList.add('uploaded');
+    } else {
+      $('file-badge').classList.remove('vis');
+      $('upload-area').classList.remove('uploaded');
+    }
+  }
+
+  // ===== 右侧 Tabs (preview/results/log/history) =====
   document.querySelectorAll('.tab-item[data-tab]').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.tab-item[data-tab]').forEach(t => t.classList.remove('active'));
@@ -880,22 +1035,25 @@ body {
       $('stat-failed').textContent = data.statistics.failed;
       $('stat-unavailable').textContent = data.statistics.unavailable;
       $('stat-total').textContent = data.statistics.total;
-      failedCount = data.statistics.failed;
+      const runningPlatform = data.platform || currentPlatform;
+      platformState[runningPlatform].failedCount = data.statistics.failed;
     }
   });
 
   socket.on('result_row', row => addResultRow(row));
 
   socket.on('crawl_complete', data => {
+    const platform = data.platform || currentPlatform;
+    const platformLabel = (API[platform] || API.jd).label;
     if (data.success) {
-      appendLog({ timestamp: now(), level: 'INFO', message: '爬取完成！' });
-      outputFileName = data.output_file;
+      appendLog({ timestamp: now(), level: 'INFO', message: `[${platformLabel}] 爬取完成!` });
+      platformState[platform].outputFileName = data.output_file;
       hide($('btn-stop'));
       show($('btn-download'));
       $('completion-banner').classList.add('vis');
-      if (failedCount > 0) show($('btn-retry'));
+      if (platformState[platform].failedCount > 0) show($('btn-retry'));
     } else {
-      appendLog({ timestamp: now(), level: 'ERROR', message: '爬取失败: ' + data.error });
+      appendLog({ timestamp: now(), level: 'ERROR', message: `[${platformLabel}] 爬取失败: ${data.error}` });
       hide($('btn-stop'));
       show($('btn-start'));
     }
@@ -946,16 +1104,25 @@ body {
   function uploadFile(file) {
     const fd = new FormData();
     fd.append('file', file);
-    fetch('/api/upload', { method: 'POST', body: fd })
+    const uploadingPlatform = currentPlatform;
+    fetch(api().upload, { method: 'POST', body: fd })
       .then(r => r.json())
       .then(data => {
         if (data.success) {
-          uploadedFilePath = data.filepath;
+          platformState[uploadingPlatform].uploadedFilePath = data.filepath;
+          if (uploadingPlatform !== currentPlatform) return;  // 上传期间用户切了平台,什么都不做
           uploadArea.classList.add('uploaded');
           $('file-badge').classList.add('vis');
           $('file-badge-text').textContent = `${data.filename} \u00b7 ${data.url_count} 个商品`;
+          platformState[uploadingPlatform].fileBadgeText = $('file-badge-text').textContent;
           $('btn-start').disabled = false;
           loadPreview();
+          if (data.warnings && data.warnings.non_tmall_urls && data.warnings.non_tmall_urls.length) {
+            appendLog({ timestamp: now(), level: 'WARNING',
+              message: `[${API[uploadingPlatform].label}] 检测到 ${data.warnings.non_tmall_urls.length} 个非天猫/淘宝域名 URL,可能爬取失败` });
+          }
+        } else if (data.error) {
+          appendLog({ timestamp: now(), level: 'ERROR', message: `上传失败: ${data.error}` });
         }
       })
       .catch(err => console.error('Upload error:', err));
@@ -966,23 +1133,31 @@ body {
   const dash = '<span style="color:var(--ink-faint)">—</span>';
 
   function loadPreview() {
-    fetch('/api/preview').then(r => r.json()).then(data => {
-      if (!data.success) return;
+    fetch(api().preview).then(r => r.json()).then(data => {
+      if (!data.success) {
+        // 该平台还没上传过文件,重置预览区
+        show($('preview-empty'));
+        hide($('preview-table-wrap'));
+        $('preview-count').textContent = '0';
+        return;
+      }
       hide($('preview-empty'));
       show($('preview-table-wrap'));
       const tbody = $('preview-tbody');
       tbody.innerHTML = '';
+      const idField = api().idField;
       data.rows.forEach(row => {
         const tr = document.createElement('tr');
         const urlCell = row.url
           ? `<a href="${esc(row.url)}" target="_blank" rel="noopener" title="${esc(row.url)}">${esc(row.url)}</a>`
           : dash;
+        const idValue = row[idField];
         tr.innerHTML = `
           <td class="col-idx">${row.index}</td>
           <td class="col-brand">${row.brand ? esc(row.brand) : dash}</td>
           <td class="col-item" title="${esc(row.item || '')}">${row.item ? esc(row.item) : dash}</td>
           <td class="col-url">${urlCell}</td>
-          <td class="col-sku">${row.product_key ? esc(row.product_key) : dash}</td>
+          <td class="col-sku">${idValue ? esc(idValue) : dash}</td>
           <td class="col-pref">${row.price_reference ? esc(row.price_reference) : dash}</td>
         `;
         tbody.appendChild(tr);
@@ -1008,6 +1183,8 @@ body {
       forbidden: `<span class="badge badge-block">${sealFail}403</span>`,
       not_found: `<span class="badge badge-warn">${sealWarn}未找到</span>`,
       unavailable: `<span class="badge badge-warn">${sealWarn}已下架</span>`,
+      no_price: `<span class="badge badge-fail">${sealFail}无价格</span>`,
+      skipped: `<span class="badge badge-block">${sealFail}已跳过</span>`,
     };
     const badge = statusMap[row.status] || `<span class="badge badge-fail">${sealFail}未知</span>`;
     const price = row.original_price && row.original_price !== '-'
@@ -1020,6 +1197,7 @@ body {
       : dash;
     tr.innerHTML = `
       <td class="col-idx">${row.index}</td>
+      <td>${platformBadge(row.platform || 'jd')}</td>
       <td class="col-brand">${row.brand ? esc(row.brand) : dash}</td>
       <td class="col-item" title="${esc(row.item || '')}">${row.item ? esc(row.item) : dash}</td>
       <td class="col-url">${urlCell}</td>
@@ -1036,10 +1214,13 @@ body {
 
   // Actions
   $('btn-start').addEventListener('click', () => {
-    fetch('/api/crawl/start', {
+    const s = ps();
+    if (!s.uploadedFilePath) return;
+    const startingPlatform = currentPlatform;
+    fetch(api().crawlStart, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filepath: uploadedFilePath, config: {} })
+      body: JSON.stringify({ filepath: s.uploadedFilePath, config: {} })
     }).then(r => r.json()).then(data => {
       if (data.success) {
         hide($('btn-start')); show($('btn-stop'));
@@ -1047,11 +1228,14 @@ body {
         $('progress-section').classList.add('vis');
         $('stats-bar').classList.add('vis');
         $('completion-banner').classList.remove('vis');
-        resultCount = 0; failedCount = 0;
+        platformState[startingPlatform].failedCount = 0;
+        resultCount = 0;
         $('results-count').textContent = '0';
         $('results-tbody').innerHTML = '';
         clearLogEmpty();
         switchTab('results');
+      } else if (data.error) {
+        appendLog({ timestamp: now(), level: 'ERROR', message: data.error });
       }
     });
   });
@@ -1061,15 +1245,18 @@ body {
   });
 
   $('btn-download').addEventListener('click', () => {
-    if (outputFileName) window.location.href = `/api/download/${outputFileName}`;
+    const fname = ps().outputFileName;
+    if (fname) window.location.href = `/api/download/${encodeURIComponent(fname)}`;
   });
 
   $('btn-retry').addEventListener('click', () => {
-    fetch('/api/crawl/retry', { method: 'POST' }).then(r => r.json()).then(data => {
+    fetch(api().crawlRetry, { method: 'POST' }).then(r => r.json()).then(data => {
       if (data.success) {
         hide($('btn-retry')); hide($('btn-download')); hide($('btn-start')); show($('btn-stop'));
         $('completion-banner').classList.remove('vis');
-        appendLog({ timestamp: now(), level: 'INFO', message: `正在重试 ${data.retry_count} 个失败项...` });
+        appendLog({ timestamp: now(), level: 'INFO', message: `[${api().label}] 正在重试 ${data.retry_count} 个失败项...` });
+      } else if (data.error) {
+        appendLog({ timestamp: now(), level: 'ERROR', message: data.error });
       }
     });
   });
@@ -1078,6 +1265,7 @@ body {
   $('qc-btn').addEventListener('click', doQC);
   $('qc-input').addEventListener('keydown', e => { if (e.key === 'Enter') doQC(); });
   function doQC() {
+    if (currentPlatform !== 'jd') return;  // 天猫不支持快速查询
     const val = $('qc-input').value.trim();
     if (!val) return;
     $('qc-btn').disabled = true;
@@ -1099,7 +1287,12 @@ body {
     });
   }
 
-  // History
+  // History (混合显示,带平台标识)
+  function platformOfFile(fname) {
+    if (fname.startsWith('Tmall_')) return 'tmall';
+    return 'jd';  // JD_ 前缀,或旧的 Price_Marks_ 文件,都视为京东
+  }
+
   function loadHistory() {
     fetch('/api/history').then(r => r.json()).then(data => {
       if (!data.success || !data.files.length) {
@@ -1115,7 +1308,8 @@ body {
         el.className = 'history-row';
         const kb = (f.size / 1024).toFixed(1);
         const rows = f.row_count !== null ? ` \u00b7 ${f.row_count} 条` : '';
-        el.innerHTML = `<div><div class="history-name">${f.filename}</div><div class="history-meta">${f.modified} \u00b7 ${kb} KB${rows}</div></div><a class="history-dl" href="/api/download/${f.filename}">下载</a>`;
+        const pbadge = platformBadge(platformOfFile(f.filename));
+        el.innerHTML = `<div><div class="history-name">${pbadge} ${esc(f.filename)}</div><div class="history-meta">${f.modified} \u00b7 ${kb} KB${rows}</div></div><a class="history-dl" href="/api/download/${encodeURIComponent(f.filename)}">下载</a>`;
         list.appendChild(el);
       });
     });

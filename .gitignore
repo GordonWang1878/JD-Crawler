@@ -27,6 +27,15 @@ wheels/
 jd_cookies.pkl
 *.pkl
 
+# 天猫/淘宝 Chrome 持久化 profile（含登录态，几十MB缓存）
+taobao_chrome_profile/
+spike_tmall_result.json
+
+# 京东 Chrome profile 池（patchright,含登录 cookies,几百 MB）
+jd_chrome_profile_pool/
+jd_chrome_profile_pool.bak/
+jd_chrome_profile/
+
 # ChromeDriver 可执行文件
 chromedriver_*
 chromedriver

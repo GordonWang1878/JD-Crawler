@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>京东价格爬虫 — 东方工艺</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&family=Noto+Sans+SC:wght@300;400;500;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ========== RESET & BASE ========== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --xuan: #F5F0E8;
+  --xuan-dark: #EDE6D8;
+  --ink: #2C2C2C;
+  --ink-light: #4A4A4A;
+  --ink-faint: #8A8578;
+  --cinnabar: #C23A2A;
+  --cinnabar-light: #D4564A;
+  --cinnabar-dark: #9E2E22;
+  --gold: #C4A265;
+  --gold-light: #D4B87A;
+  --gold-faint: rgba(196, 162, 101, 0.15);
+  --success-red: #C23A2A;
+  --font-title: 'ZCOOL XiaoWei', serif;
+  --font-body: 'Noto Sans SC', sans-serif;
+  --font-num: 'Lora', serif;
+}
+
+html { font-size: 14px; }
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--xuan);
+  color: var(--ink);
+  min-height: 100vh;
+  overflow-x: hidden;
+  /* Xuan paper texture */
+  background-image:
+    url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+}
+
+/* ========== INK WASH TOP STRIP ========== */
+.ink-wash-strip {
+  position: relative;
+  width: 100%;
+  height: 90px;
+  overflow: hidden;
+}
+
+.ink-wash-strip svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ========== HEADER ========== */
+.header {
+  position: relative;
+  padding: 0 48px;
+  margin-top: -40px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  z-index: 10;
+}
+
+.header-left {
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+}
+
+.title-group h1 {
+  font-family: var(--font-title);
+  font-size: 2.8rem;
+  color: var(--ink);
+  letter-spacing: 6px;
+  line-height: 1.2;
+}
+
+.title-group .subtitle {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+  letter-spacing: 2px;
+  margin-top: 2px;
+  font-weight: 300;
+}
+
+/* Seal stamp */
+.seal-stamp {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  transform: rotate(-8deg);
+  margin-bottom: 4px;
+  cursor: default;
+  transition: transform 0.3s ease;
+}
+
+.seal-stamp:hover {
+  transform: rotate(-4deg) scale(1.05);
+}
+
+.seal-stamp svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Header right — seal stamp */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 8px;
+}
+
+.header-right .version-text {
+  font-family: var(--font-num);
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  letter-spacing: 1px;
+}
+
+/* ========== MAIN LAYOUT ========== */
+.main-layout {
+  display: flex;
+  gap: 0;
+  padding: 28px 48px 48px;
+  min-height: calc(100vh - 130px);
+}
+
+/* ========== LEFT PANEL (Scroll) ========== */
+.left-panel {
+  width: 280px;
+  min-width: 280px;
+  position: relative;
+  padding-right: 32px;
+}
+
+/* Scroll border decoration */
+.left-panel::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 12px;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    var(--gold) 8%,
+    var(--gold) 15%,
+    transparent 18%,
+    var(--ink-faint) 22%,
+    var(--ink-faint) 78%,
+    transparent 82%,
+    var(--gold) 85%,
+    var(--gold) 92%,
+    transparent 100%
+  );
+  opacity: 0.4;
+}
+
+.section-label {
+  font-family: var(--font-title);
+  font-size: 1.05rem;
+  color: var(--ink);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 2px;
+}
+
+.section-label::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cinnabar);
+  flex-shrink: 0;
+}
+
+.section-gap { margin-top: 28px; }
+
+/* Upload area — brush stroke dashed border */
+.upload-area {
+  position: relative;
+  padding: 24px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-area svg.brush-border {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.upload-area:hover {
+  background: var(--gold-faint);
+}
+
+.upload-icon {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+
+.upload-text {
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+  line-height: 1.6;
+}
+
+.upload-text strong {
+  color: var(--ink-light);
+  font-weight: 500;
+}
+
+/* File info */
+.file-info {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: rgba(196, 162, 101, 0.08);
+  border-left: 2px solid var(--gold);
+  font-size: 0.8rem;
+  color: var(--ink-light);
+  line-height: 1.6;
+}
+
+.file-info .filename {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* Buttons */
+.btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 10px 16px;
+  border: none;
+  cursor: pointer;
+  letter-spacing: 2px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-primary {
+  background: var(--cinnabar);
+  color: #fff;
+}
+
+.btn-primary:hover { background: var(--cinnabar-dark); }
+
+.btn-outline {
+  background: transparent;
+  color: var(--ink-light);
+  border: 1px solid rgba(44, 44, 44, 0.2);
+}
+
+.btn-outline:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.btn-gold {
+  background: var(--gold);
+  color: #fff;
+}
+
+.btn-gold:hover { background: var(--gold-light); }
+
+/* Quick query */
+.quick-query {
+  display: flex;
+  gap: 6px;
+}
+
+.quick-query input {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 8px 12px;
+  border: 1px solid rgba(44, 44, 44, 0.15);
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.quick-query input:focus {
+  border-color: var(--gold);
+}
+
+.quick-query input::placeholder {
+  color: var(--ink-faint);
+}
+
+.quick-query .btn {
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+/* Progress section */
+.progress-section {
+  margin-top: 8px;
+}
+
+.progress-numbers {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.progress-current {
+  font-family: var(--font-num);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--cinnabar);
+  line-height: 1;
+}
+
+.progress-divider {
+  font-family: var(--font-num);
+  font-size: 1rem;
+  color: var(--ink-faint);
+  margin: 0 2px;
+}
+
+.progress-total {
+  font-family: var(--font-num);
+  font-size: 1.2rem;
+  color: var(--ink-light);
+  line-height: 1;
+}
+
+.progress-pct {
+  font-family: var(--font-num);
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+  margin-left: 8px;
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(44, 44, 44, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  width: 52%;
+  background: linear-gradient(90deg, var(--cinnabar), var(--cinnabar-light));
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+/* Stats — vertical reading */
+.stats-vertical {
+  display: flex;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.stat-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.stat-col .stat-label {
+  writing-mode: vertical-rl;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  letter-spacing: 4px;
+}
+
+.stat-col .stat-value {
+  font-family: var(--font-num);
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-top: 6px;
+}
+
+.stat-col.success .stat-value { color: var(--cinnabar); }
+.stat-col.fail .stat-value { color: var(--ink-faint); }
+.stat-col.offline .stat-value { color: var(--gold); }
+.stat-col.total .stat-value { color: var(--ink); }
+
+/* Seal checkmark for success */
+.seal-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+/* ========== RIGHT PANEL (Xuan paper spread) ========== */
+.right-panel {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Tabs */
+.tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid rgba(44, 44, 44, 0.1);
+  margin-bottom: 20px;
+}
+
+.tab-item {
+  font-family: var(--font-title);
+  font-size: 0.95rem;
+  padding: 10px 24px;
+  cursor: pointer;
+  color: var(--ink-faint);
+  letter-spacing: 2px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.tab-item:hover {
+  color: var(--ink);
+}
+
+.tab-item.active {
+  color: var(--ink);
+  border-bottom-color: var(--cinnabar);
+}
+
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: var(--cinnabar);
+  border-radius: 50%;
+}
+
+/* Ink brush divider SVG */
+.ink-divider {
+  width: 100%;
+  height: 8px;
+  margin: 16px 0;
+  opacity: 0.2;
+}
+
+/* Table */
+.data-table-wrap {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.data-table thead th {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(44, 44, 44, 0.12);
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.data-table tbody tr {
+  transition: background 0.15s;
+}
+
+.data-table tbody tr:hover {
+  background: rgba(196, 162, 101, 0.06);
+}
+
+.data-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(44, 44, 44, 0.05);
+  vertical-align: middle;
+}
+
+.data-table .col-sku {
+  font-family: var(--font-num);
+  font-size: 0.82rem;
+  color: var(--ink-light);
+  letter-spacing: 0.5px;
+}
+
+.data-table .col-name {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.83rem;
+}
+
+.data-table .col-price {
+  font-family: var(--font-num);
+  font-weight: 600;
+  color: var(--cinnabar);
+  white-space: nowrap;
+}
+
+.data-table .col-price .currency {
+  font-size: 0.75rem;
+  font-weight: 400;
+  margin-right: 1px;
+}
+
+.data-table .col-original {
+  font-family: var(--font-num);
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  text-decoration: line-through;
+}
+
+.data-table .col-discount {
+  font-family: var(--font-num);
+  font-size: 0.8rem;
+  color: var(--gold);
+  font-weight: 600;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+
+.status-badge.success {
+  color: var(--cinnabar);
+  background: rgba(194, 58, 42, 0.06);
+}
+
+.status-badge.fail {
+  color: var(--ink-faint);
+  background: rgba(44, 44, 44, 0.06);
+}
+
+.status-badge.offline {
+  color: var(--gold);
+  background: var(--gold-faint);
+}
+
+/* Seal mini checkmark */
+.seal-mini {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+/* Log panel (hidden by default, shown for reference) */
+.log-panel, .history-panel, .preview-panel { display: none; }
+
+/* ========== TAB CONTENT AREAS ========== */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Log entries */
+.log-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.log-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  transition: background 0.15s;
+}
+
+.log-entry:hover { background: rgba(196, 162, 101, 0.05); }
+
+.log-time {
+  font-family: var(--font-num);
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  min-width: 68px;
+  padding-top: 1px;
+}
+
+.log-msg { color: var(--ink-light); }
+.log-entry.success .log-msg { color: var(--ink); }
+.log-entry.error .log-msg { color: var(--cinnabar); }
+.log-entry.warn .log-msg { color: var(--gold); }
+
+.log-entry .log-sku {
+  font-family: var(--font-num);
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  background: rgba(44,44,44,0.04);
+  padding: 0 4px;
+}
+
+/* History */
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.35);
+  border-left: 2px solid var(--gold);
+  transition: all 0.2s;
+}
+
+.history-item:hover {
+  background: rgba(255,255,255,0.55);
+}
+
+.history-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.history-date {
+  font-family: var(--font-num);
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+}
+
+.history-file {
+  font-size: 0.85rem;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.history-stats {
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+}
+
+.history-download {
+  font-size: 0.78rem;
+  color: var(--gold);
+  cursor: pointer;
+  border: 1px solid var(--gold);
+  padding: 4px 12px;
+  transition: all 0.2s;
+  background: transparent;
+  font-family: var(--font-body);
+}
+
+.history-download:hover {
+  background: var(--gold);
+  color: #fff;
+}
+
+/* Preview table (simpler) */
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.83rem;
+}
+
+.preview-table th {
+  font-weight: 500;
+  color: var(--ink-faint);
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(44,44,44,0.1);
+  font-size: 0.78rem;
+}
+
+.preview-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(44,44,44,0.04);
+  font-family: var(--font-num);
+  font-size: 0.82rem;
+  color: var(--ink-light);
+}
+
+/* ========== SCROLLBAR ========== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(44,44,44,0.12); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(44,44,44,0.25); }
+
+/* ========== ANIMATIONS ========== */
+@keyframes sealStamp {
+  0% { transform: rotate(-8deg) scale(0.3); opacity: 0; }
+  60% { transform: rotate(-8deg) scale(1.15); opacity: 1; }
+  100% { transform: rotate(-8deg) scale(1); opacity: 1; }
+}
+
+.seal-stamp { animation: sealStamp 0.6s ease-out 0.3s both; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up { animation: fadeUp 0.5s ease-out both; }
+.fade-up-d1 { animation-delay: 0.1s; }
+.fade-up-d2 { animation-delay: 0.2s; }
+.fade-up-d3 { animation-delay: 0.3s; }
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1000px) {
+  .main-layout { flex-direction: column; padding: 20px 20px 40px; }
+  .left-panel { width: 100%; min-width: 0; padding-right: 0; padding-bottom: 24px; }
+  .left-panel::after { display: none; }
+  .header { padding: 0 20px; }
+  .stats-vertical { justify-content: space-around; }
+}
+</style>
+</head>
+<body>
+
+<!-- ========== INK WASH MOUNTAIN STRIP ========== -->
+<div class="ink-wash-strip">
+  <svg viewBox="0 0 1440 90" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="inkFade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#2C2C2C" stop-opacity="0.85"/>
+        <stop offset="60%" stop-color="#2C2C2C" stop-opacity="0.15"/>
+        <stop offset="100%" stop-color="#2C2C2C" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <!-- Mountain silhouette layers -->
+    <path d="M0,0 L0,35 Q80,55 160,38 Q240,18 360,42 Q420,54 500,36 Q580,15 700,40 Q800,58 900,30 Q1000,10 1100,35 Q1200,52 1320,28 Q1380,18 1440,32 L1440,0 Z" fill="url(#inkFade)"/>
+    <path d="M0,0 L0,22 Q120,40 240,25 Q360,8 480,28 Q600,42 720,20 Q840,5 960,25 Q1080,38 1200,18 Q1320,4 1440,20 L1440,0 Z" fill="#2C2C2C" opacity="0.5"/>
+    <path d="M0,0 L0,12 Q200,28 400,14 Q600,2 800,18 Q1000,28 1200,10 Q1350,2 1440,14 L1440,0 Z" fill="#2C2C2C" opacity="0.8"/>
+  </svg>
+</div>
+
+<!-- ========== HEADER ========== -->
+<div class="header fade-up">
+  <div class="header-left">
+    <!-- Seal stamp -->
+    <div class="seal-stamp">
+      <svg viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="36" cy="36" r="32" fill="none" stroke="#C23A2A" stroke-width="3" opacity="0.85"/>
+        <circle cx="36" cy="36" r="28" fill="none" stroke="#C23A2A" stroke-width="1" opacity="0.4"/>
+        <!-- Irregular edge marks -->
+        <line x1="8" y1="20" x2="11" y2="21" stroke="#C23A2A" stroke-width="1.5" opacity="0.3"/>
+        <line x1="58" y1="52" x2="62" y2="54" stroke="#C23A2A" stroke-width="1.5" opacity="0.3"/>
+        <line x1="12" y1="55" x2="15" y2="53" stroke="#C23A2A" stroke-width="1" opacity="0.25"/>
+        <!-- 价 character -->
+        <text x="36" y="42" text-anchor="middle" font-family="'ZCOOL XiaoWei', serif" font-size="28" fill="#C23A2A" opacity="0.9">价</text>
+      </svg>
+    </div>
+    <div class="title-group">
+      <h1>京东价格爬虫</h1>
+      <div class="subtitle">JD Price Crawler · 数据采集工具</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="version-text">v2.1.0</span>
+  </div>
+</div>
+
+<!-- ========== MAIN LAYOUT ========== -->
+<div class="main-layout">
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+
+    <!-- Upload -->
+    <div class="section-label fade-up fade-up-d1">上传文件</div>
+    <div class="upload-area fade-up fade-up-d1">
+      <svg class="brush-border" viewBox="0 0 248 110" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+        <path d="M4,4 Q6,2 20,3 L60,2 Q80,4 100,3 L140,2 Q160,4 180,3 L220,2 Q240,4 244,4
+                 Q246,6 245,20 L244,50 Q246,70 245,85 L244,106
+                 Q242,108 228,107 L188,108 Q168,106 148,107 L108,108 Q88,106 68,107 L28,108 Q8,106 4,106
+                 Q2,104 3,90 L2,55 Q4,35 3,20 Z"
+              fill="none" stroke="#2C2C2C" stroke-width="1" opacity="0.18"
+              stroke-dasharray="6,4,2,4" stroke-linecap="round"/>
+        <!-- Brush-like corner accents -->
+        <path d="M3,3 Q8,2 14,3" fill="none" stroke="#2C2C2C" stroke-width="1.5" opacity="0.12" stroke-linecap="round"/>
+        <path d="M234,3 Q240,2 245,4" fill="none" stroke="#2C2C2C" stroke-width="1.5" opacity="0.12" stroke-linecap="round"/>
+        <path d="M3,107 Q8,108 14,106" fill="none" stroke="#2C2C2C" stroke-width="1.5" opacity="0.12" stroke-linecap="round"/>
+        <path d="M234,107 Q240,108 245,106" fill="none" stroke="#2C2C2C" stroke-width="1.5" opacity="0.12" stroke-linecap="round"/>
+      </svg>
+      <svg class="upload-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M16 4 L16 22 M8 12 L16 4 L24 12" stroke="#8A8578" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M4 22 L4 26 Q4 28 6 28 L26 28 Q28 28 28 26 L28 22" stroke="#8A8578" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="upload-text">
+        <strong>点击或拖拽上传</strong><br>
+        支持 .xlsx / .csv 文件
+      </div>
+    </div>
+
+    <!-- File info -->
+    <div class="file-info fade-up fade-up-d1">
+      <div class="filename">商品SKU列表_2026Q1.xlsx</div>
+      <div>共 156 条SKU · 42.3 KB</div>
+    </div>
+
+    <!-- Actions -->
+    <div class="section-gap"></div>
+    <div class="section-label fade-up fade-up-d2">操作</div>
+    <div class="btn-group fade-up fade-up-d2">
+      <button class="btn btn-primary">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 2 L12 7 L3 12 Z" fill="currentColor"/></svg>
+        开始爬取
+      </button>
+      <button class="btn btn-outline">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="3" y="3" width="8" height="8" rx="1" fill="currentColor"/></svg>
+        停止
+      </button>
+      <button class="btn btn-outline">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7 Q2 3 7 3 L7 1 L10 4 L7 7 L7 5 Q4 5 4 7 Q4 9 7 9 L7 11 Q2 11 2 7Z" fill="currentColor"/></svg>
+        重试失败项
+      </button>
+      <button class="btn btn-gold">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1 L7 9 M3 6 L7 10 L11 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M2 11 L12 11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        下载结果
+      </button>
+    </div>
+
+    <!-- Quick Query -->
+    <div class="section-gap"></div>
+    <div class="section-label fade-up fade-up-d2">快速查询</div>
+    <div class="quick-query fade-up fade-up-d2">
+      <input type="text" placeholder="输入SKU编号…" value="10089234">
+      <button class="btn btn-outline" style="border-color: var(--gold); color: var(--gold);">查询</button>
+    </div>
+
+    <!-- Progress -->
+    <div class="section-gap"></div>
+    <div class="section-label fade-up fade-up-d3">进度</div>
+    <div class="progress-section fade-up fade-up-d3">
+      <div class="progress-numbers">
+        <span class="progress-current">82</span>
+        <span class="progress-divider">/</span>
+        <span class="progress-total">156</span>
+        <span class="progress-pct">52%</span>
+      </div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill"></div>
+      </div>
+    </div>
+
+    <!-- Stats vertical -->
+    <div class="stats-vertical fade-up fade-up-d3">
+      <div class="stat-col success">
+        <span class="stat-value">98</span>
+        <span class="stat-label">成功</span>
+      </div>
+      <div class="stat-col fail">
+        <span class="stat-value">12</span>
+        <span class="stat-label">失败</span>
+      </div>
+      <div class="stat-col offline">
+        <span class="stat-value">8</span>
+        <span class="stat-label">下架</span>
+      </div>
+      <div class="stat-col total">
+        <span class="stat-value">118</span>
+        <span class="stat-label">合计</span>
+      </div>
+    </div>
+
+  </div><!-- /left-panel -->
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+
+    <!-- Tabs -->
+    <div class="tab-bar fade-up fade-up-d1">
+      <div class="tab-item" onclick="switchTab('preview')">数据预览</div>
+      <div class="tab-item active" onclick="switchTab('results')">爬取结果</div>
+      <div class="tab-item" onclick="switchTab('logs')">运行日志</div>
+      <div class="tab-item" onclick="switchTab('history')">历史记录</div>
+    </div>
+
+    <!-- TAB: Data Preview -->
+    <div class="tab-content" id="tab-preview">
+      <table class="preview-table">
+        <thead>
+          <tr>
+            <th>序号</th>
+            <th>SKU编号</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>10089234</td><td>—</td></tr>
+          <tr><td>2</td><td>10034521</td><td>—</td></tr>
+          <tr><td>3</td><td>10076453</td><td>重点监控</td></tr>
+          <tr><td>4</td><td>10098712</td><td>—</td></tr>
+          <tr><td>5</td><td>10045678</td><td>—</td></tr>
+          <tr><td>6</td><td>10023456</td><td>竞品</td></tr>
+          <tr><td>7</td><td>10067890</td><td>—</td></tr>
+          <tr><td>8</td><td>10012345</td><td>—</td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:12px; font-size:0.78rem; color:var(--ink-faint);">共 156 条 · 显示前 8 条</div>
+    </div>
+
+    <!-- TAB: Results -->
+    <div class="tab-content active" id="tab-results">
+
+      <!-- Ink brush divider -->
+      <svg class="ink-divider" viewBox="0 0 800 8" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0,4 Q20,2 50,4 T100,4 T150,3 T200,5 T250,4 T300,3 T350,5 T400,4 T450,3 T500,5 T550,4 T600,3 T650,5 T700,4 T750,3 T800,4"
+              fill="none" stroke="#2C2C2C" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width:40px">#</th>
+              <th>SKU</th>
+              <th>商品名称</th>
+              <th>现价</th>
+              <th>原价</th>
+              <th>折扣</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="color:var(--ink-faint); font-family:var(--font-num); font-size:0.78rem;">1</td>
+              <td class="col-sku">10089234</td>
+              <td class="col-name">海尔冰箱 BCD-470WDPG 十字对开门变频一级能效</td>
+              <td class="col-price"><span class="currency">¥</span>3,299</td>
+              <td class="col-original">¥4,599</td>
+              <td class="col-discount">7.2折</td>
+              <td><span class="status-badge success"><svg class="seal-mini" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="#C23A2A" stroke-width="0.8" opacity="0.6"/><path d="M3.5 6 L5.5 8 L8.5 4" fill="none" stroke="#C23A2A" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>成功</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--ink-faint); font-family:var(--font-num); font-size:0.78rem;">2</td>
+              <td class="col-sku">10034521</td>
+              <td class="col-name">华为 MatePad Pro 13.2英寸 麒麟9000S 12+256GB</td>
+              <td class="col-price"><span class="currency">¥</span>5,199</td>
+              <td class="col-original">¥5,699</td>
+              <td class="col-discount">9.1折</td>
+              <td><span class="status-badge success"><svg class="seal-mini" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="#C23A2A" stroke-width="0.8" opacity="0.6"/><path d="M3.5 6 L5.5 8 L8.5 4" fill="none" stroke="#C23A2A" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>成功</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--ink-faint); font-family:var(--font-num); font-size:0.78rem;">3</td>
+              <td class="col-sku">10076453</td>
+              <td class="col-name">Apple iPhone 15 Pro Max 256GB 原色钛金属</td>
+              <td class="col-price"><span class="currency">¥</span>8,999</td>
+              <td class="col-original">¥9,999</td>
+              <td class="col-discount">9.0折</td>
+              <td><span class="status-badge success"><svg class="seal-mini" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="#C23A2A" stroke-width="0.8" opacity="0.6"/><path d="M3.5 6 L5.5 8 L8.5 4" fill="none" stroke="#C23A2A" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>成功</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--ink-faint); font-family:var(--font-num); font-size:0.78rem;">4</td>
+              <td class="col-sku">10098712</td>
+              <td class="col-name">戴森 V15 Detect Total Clean 无绳吸尘器</td>
+              <td class="col-price"><span class="currency">¥</span>4,490</td>
+              <td class="col-original">¥5,490</td>
+              <td class="col-discount">8.2折</td>
+              <td><span class="status-badge success"><svg class="seal-mini" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="#C23A2A" stroke-width="0.8" opacity="0.6"/><path d="M3.5 6 L5.5 8 L8.5 4" fill="none" stroke="#C23A2A" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>成功</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--ink-faint); font-family:var(--font-num); font-size:0.78rem;">5</td>
+              <td class="col-sku">10045678</td>
+              <td class="col-name">索尼 WH-1000XM5 头戴式无线降噪耳机 黑色</td>
+              <td class="col-price"><span class="currency">¥</span>2,099</td>
+              <td class="col-original">¥2,999</td>
+              <td class="col-discount">7.0折</td>
+              <td><span class="status-badge success"><svg class="seal-mini" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="#C23A2A" stroke-width="0.8" opacity="0.6"/><path d="M3.5 6 L5.5 8 L8.5 4" fill="none" stroke="#C23A2A" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>成功</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--ink-faint); font-family:var(--font-num); font-size:0.78rem;">6</td>
+              <td class="col-sku">10023456</td>
+              <td class="col-name">小米电视 S Pro 85英寸 Mini LED 4K超高清</td>
+              <td class="col-price"><span class="currency">¥</span>7,999</td>
+              <td class="col-original">¥9,999</td>
+              <td class="col-discount">8.0折</td>
+              <td><span class="status-badge success"><svg class="seal-mini" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="#C23A2A" stroke-width="0.8" opacity="0.6"/><path d="M3.5 6 L5.5 8 L8.5 4" fill="none" stroke="#C23A2A" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>成功</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--ink-faint); font-family:var(--font-num); font-size:0.78rem;">7</td>
+              <td class="col-sku">10067890</td>
+              <td class="col-name">格力空调 云逸II KFR-35GW 1.5匹新一级变频</td>
+              <td class="col-price"><span class="currency">¥</span>3,199</td>
+              <td class="col-original">¥3,899</td>
+              <td class="col-discount">8.2折</td>
+              <td><span class="status-badge success"><svg class="seal-mini" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="#C23A2A" stroke-width="0.8" opacity="0.6"/><path d="M3.5 6 L5.5 8 L8.5 4" fill="none" stroke="#C23A2A" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>成功</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--ink-faint); font-family:var(--font-num); font-size:0.78rem;">8</td>
+              <td class="col-sku">10012345</td>
+              <td class="col-name">茅台飞天 53度 500ml 2025年出厂</td>
+              <td class="col-price" style="color:var(--ink-faint);">—</td>
+              <td class="col-original">—</td>
+              <td class="col-discount">—</td>
+              <td><span class="status-badge offline"><svg class="seal-mini" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="#C4A265" stroke-width="0.8" opacity="0.6"/><path d="M4 4 L8 8 M8 4 L4 8" stroke="#C4A265" stroke-width="0.8" stroke-linecap="round"/></svg>下架</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--ink-faint); font-family:var(--font-num); font-size:0.78rem;">9</td>
+              <td class="col-sku">10056789</td>
+              <td class="col-name">联想 ThinkPad X1 Carbon Gen 12 i7-1365U</td>
+              <td class="col-price"><span class="currency">¥</span>9,499</td>
+              <td class="col-original">¥11,999</td>
+              <td class="col-discount">7.9折</td>
+              <td><span class="status-badge success"><svg class="seal-mini" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="#C23A2A" stroke-width="0.8" opacity="0.6"/><path d="M3.5 6 L5.5 8 L8.5 4" fill="none" stroke="#C23A2A" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>成功</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--ink-faint); font-family:var(--font-num); font-size:0.78rem;">10</td>
+              <td class="col-sku">10078901</td>
+              <td class="col-name">美的洗碗机 RX600Pro 16套嵌入式热风烘干</td>
+              <td class="col-price" style="color:var(--ink-faint);">—</td>
+              <td class="col-original">—</td>
+              <td class="col-discount">—</td>
+              <td><span class="status-badge fail"><svg class="seal-mini" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="#8A8578" stroke-width="0.8" opacity="0.5"/><path d="M6 3.5 L6 7 M6 8.5 L6 8.5" stroke="#8A8578" stroke-width="1" stroke-linecap="round"/></svg>失败</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--ink-faint); font-family:var(--font-num); font-size:0.78rem;">11</td>
+              <td class="col-sku">10090123</td>
+              <td class="col-name">科沃斯 T30 Pro 扫拖机器人 自清洁基站</td>
+              <td class="col-price"><span class="currency">¥</span>3,799</td>
+              <td class="col-original">¥4,999</td>
+              <td class="col-discount">7.6折</td>
+              <td><span class="status-badge success"><svg class="seal-mini" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="#C23A2A" stroke-width="0.8" opacity="0.6"/><path d="M3.5 6 L5.5 8 L8.5 4" fill="none" stroke="#C23A2A" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>成功</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--ink-faint); font-family:var(--font-num); font-size:0.78rem;">12</td>
+              <td class="col-sku">10043210</td>
+              <td class="col-name">三星 Galaxy S24 Ultra 12+512GB 钛灰色</td>
+              <td class="col-price"><span class="currency">¥</span>9,699</td>
+              <td class="col-original">¥10,999</td>
+              <td class="col-discount">8.8折</td>
+              <td><span class="status-badge success"><svg class="seal-mini" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="#C23A2A" stroke-width="0.8" opacity="0.6"/><path d="M3.5 6 L5.5 8 L8.5 4" fill="none" stroke="#C23A2A" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>成功</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:14px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:0.78rem; color:var(--ink-faint);">显示 1-12 / 共 118 条结果</span>
+        <div style="display:flex; gap:4px;">
+          <span style="font-family:var(--font-num); font-size:0.78rem; padding:4px 10px; background:var(--cinnabar); color:#fff; cursor:pointer;">1</span>
+          <span style="font-family:var(--font-num); font-size:0.78rem; padding:4px 10px; color:var(--ink-faint); cursor:pointer;">2</span>
+          <span style="font-family:var(--font-num); font-size:0.78rem; padding:4px 10px; color:var(--ink-faint); cursor:pointer;">3</span>
+          <span style="font-family:var(--font-num); font-size:0.78rem; padding:4px 10px; color:var(--ink-faint); cursor:pointer;">…</span>
+          <span style="font-family:var(--font-num); font-size:0.78rem; padding:4px 10px; color:var(--ink-faint); cursor:pointer;">10</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Logs -->
+    <div class="tab-content" id="tab-logs">
+      <svg class="ink-divider" viewBox="0 0 800 8" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0,4 Q20,6 50,3 T100,5 T150,4 T200,3 T250,5 T300,4 T350,3 T400,5 T450,4 T500,5 T550,3 T600,4 T650,5 T700,3 T750,4 T800,4"
+              fill="none" stroke="#2C2C2C" stroke-width="1" stroke-linecap="round"/>
+      </svg>
+      <div class="log-entries">
+        <div class="log-entry">
+          <span class="log-time">14:23:01</span>
+          <span class="log-msg">系统初始化完成，已加载 156 条SKU数据</span>
+        </div>
+        <div class="log-entry">
+          <span class="log-time">14:23:02</span>
+          <span class="log-msg">ChromeDriver 版本匹配成功 (v124.0.6367)</span>
+        </div>
+        <div class="log-entry">
+          <span class="log-time">14:23:03</span>
+          <span class="log-msg">开始爬取任务，线程池大小: 4</span>
+        </div>
+        <div class="log-entry success">
+          <span class="log-time">14:23:05</span>
+          <span class="log-msg"><span class="log-sku">10089234</span> 采集成功 · ¥3,299 · 海尔冰箱 BCD-470WDPG</span>
+        </div>
+        <div class="log-entry success">
+          <span class="log-time">14:23:07</span>
+          <span class="log-msg"><span class="log-sku">10034521</span> 采集成功 · ¥5,199 · 华为 MatePad Pro</span>
+        </div>
+        <div class="log-entry success">
+          <span class="log-time">14:23:09</span>
+          <span class="log-msg"><span class="log-sku">10076453</span> 采集成功 · ¥8,999 · Apple iPhone 15 Pro Max</span>
+        </div>
+        <div class="log-entry error">
+          <span class="log-time">14:23:11</span>
+          <span class="log-msg"><span class="log-sku">10078901</span> 采集失败 · 页面加载超时 (30s)</span>
+        </div>
+        <div class="log-entry success">
+          <span class="log-time">14:23:13</span>
+          <span class="log-msg"><span class="log-sku">10098712</span> 采集成功 · ¥4,490 · 戴森 V15 Detect</span>
+        </div>
+        <div class="log-entry warn">
+          <span class="log-time">14:23:15</span>
+          <span class="log-msg"><span class="log-sku">10012345</span> 商品已下架 · 茅台飞天 53度</span>
+        </div>
+        <div class="log-entry success">
+          <span class="log-time">14:23:17</span>
+          <span class="log-msg"><span class="log-sku">10045678</span> 采集成功 · ¥2,099 · 索尼 WH-1000XM5</span>
+        </div>
+        <div class="log-entry success">
+          <span class="log-time">14:23:19</span>
+          <span class="log-msg"><span class="log-sku">10023456</span> 采集成功 · ¥7,999 · 小米电视 S Pro 85</span>
+        </div>
+        <div class="log-entry success">
+          <span class="log-time">14:23:21</span>
+          <span class="log-msg"><span class="log-sku">10067890</span> 采集成功 · ¥3,199 · 格力空调 云逸II</span>
+        </div>
+        <div class="log-entry">
+          <span class="log-time">14:23:22</span>
+          <span class="log-msg">已完成 82/156 · 预计剩余时间 3分12秒</span>
+        </div>
+        <div class="log-entry error">
+          <span class="log-time">14:23:24</span>
+          <span class="log-msg"><span class="log-sku">10087654</span> 采集失败 · 验证码拦截，将稍后重试</span>
+        </div>
+        <div class="log-entry success">
+          <span class="log-time">14:23:26</span>
+          <span class="log-msg"><span class="log-sku">10090123</span> 采集成功 · ¥3,799 · 科沃斯 T30 Pro</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: History -->
+    <div class="tab-content" id="tab-history">
+      <svg class="ink-divider" viewBox="0 0 800 8" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0,4 Q30,2 60,5 T120,3 T180,5 T240,4 T300,3 T360,5 T420,4 T480,3 T540,5 T600,4 T660,3 T720,5 T800,4"
+              fill="none" stroke="#2C2C2C" stroke-width="1" stroke-linecap="round"/>
+      </svg>
+      <div class="history-list">
+        <div class="history-item">
+          <div class="history-meta">
+            <span class="history-date">2026-04-09 14:23</span>
+            <span class="history-file">商品SKU列表_2026Q1.xlsx</span>
+            <span class="history-stats">156条 · 成功98 · 失败12 · 下架8 · 进行中</span>
+          </div>
+          <button class="history-download">下载</button>
+        </div>
+        <div class="history-item">
+          <div class="history-meta">
+            <span class="history-date">2026-04-08 09:15</span>
+            <span class="history-file">竞品价格监控_0408.xlsx</span>
+            <span class="history-stats">89条 · 成功85 · 失败2 · 下架2 · 已完成</span>
+          </div>
+          <button class="history-download">下载</button>
+        </div>
+        <div class="history-item">
+          <div class="history-meta">
+            <span class="history-date">2026-04-05 16:42</span>
+            <span class="history-file">电子品类_周报数据.csv</span>
+            <span class="history-stats">234条 · 成功220 · 失败8 · 下架6 · 已完成</span>
+          </div>
+          <button class="history-download">下载</button>
+        </div>
+        <div class="history-item">
+          <div class="history-meta">
+            <span class="history-date">2026-04-01 11:30</span>
+            <span class="history-file">家电品类_月度采集.xlsx</span>
+            <span class="history-stats">412条 · 成功398 · 失败9 · 下架5 · 已完成</span>
+          </div>
+          <button class="history-download">下载</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /right-panel -->
+
+</div><!-- /main-layout -->
+
+<script>
+function switchTab(name) {
+  // Update tab buttons
+  document.querySelectorAll('.tab-item').forEach(el => el.classList.remove('active'));
+  event.target.classList.add('active');
+
+  // Update tab content
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  const map = { preview: 'tab-preview', results: 'tab-results', logs: 'tab-logs', history: 'tab-history' };
+  document.getElementById(map[name]).classList.add('active');
+}
+</script>
+
+</body>
+</html>

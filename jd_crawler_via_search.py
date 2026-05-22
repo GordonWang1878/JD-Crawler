@@ -7,7 +7,9 @@ import warnings
 # 抑制 urllib3 的 OpenSSL 警告
 warnings.filterwarnings('ignore', message='urllib3 v2 only supports OpenSSL 1.1.1+')
 
-import undetected_chromedriver as uc
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -19,6 +21,31 @@ import re
 import os
 import pickle
 from typing import Optional
+
+import jd_profile_pool
+
+# CDP attach 模式 + profile 池自动轮转
+# - 每个 profile 是一个独立 Chrome user-data-dir,在京东那里是独立"身份"
+# - 启动时 spawn profile_1 的 Chrome,连续 3 次失败时自动切到 profile_2/3/...
+CDP_PORT = jd_profile_pool.CDP_PORT
+CDP_ADDR = f'127.0.0.1:{CDP_PORT}'
+
+
+def _is_chrome_running_on_cdp_port(port: int = CDP_PORT) -> bool:
+    """兼容旧调用 — 现在转发到 profile_pool.is_cdp_port_listening"""
+    return jd_profile_pool.is_cdp_port_listening(port)
+
+
+def _profile_pool_empty_msg() -> str:
+    return (
+        f"\n{'='*60}\n"
+        f"❌ JD profile 池为空!\n\n"
+        f"请先在终端运行(只需一次):\n"
+        f"    bash prepare_jd_profile_pool.sh 3\n\n"
+        f"按提示依次给每个 profile 扫码登录京东.\n"
+        f"准备完成后再到 web UI 点'开始爬取'.\n"
+        f"{'='*60}\n"
+    )
 
 
 def _detect_chrome_version() -> Optional[int]:
@@ -48,30 +75,112 @@ class JDCrawlerViaSearch:
         self.cookies_file = cookies_file
         self.driver = None
         self.is_logged_in = False
+        # profile 池状态(可选 — 也支持"用户手动启动 Chrome,crawler 仅 attach"模式)
+        self.available_profiles = jd_profile_pool.list_available_profiles()
+        self.current_profile_id: Optional[int] = None
         self._init_driver()
 
     def _init_driver(self):
-        """初始化浏览器"""
-        try:
-            options = uc.ChromeOptions()
-            if self.headless:
-                options.add_argument('--headless=new')
-            options.add_argument('--no-sandbox')
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--window-size=1920,1080')
+        """CDP attach 模式 — 连接到 9222 端口上的 Chrome.
 
-            chrome_version = _detect_chrome_version()
-            print(f"  正在初始化浏览器... (Chrome v{chrome_version or '?'})")
-            t0 = time.time()
-            self.driver = uc.Chrome(
-                options=options,
-                version_main=chrome_version,
+        两种工作模式:
+        1. profile 池模式(自动轮转): pool 里有 profile_1..N,crawler 自动 spawn + 风控时切换
+        2. 单 Chrome 模式: 用户手动启动 Chrome(比如 launch_chrome_real_profile.sh),
+                           crawler 只 attach,不轮转
+        """
+        if _is_chrome_running_on_cdp_port(CDP_PORT):
+            # 端口已有 Chrome 在跑 — 直接 attach,不管 profile 池
+            if self.available_profiles:
+                if self.current_profile_id is None:
+                    self.current_profile_id = self.available_profiles[0]
+                print(f"  CDP 端口已有 Chrome 在跑,直接 attach (假定 profile_{self.current_profile_id})")
+            else:
+                # 单 Chrome 模式:profile 池为空,但端口有 Chrome
+                print(f"  CDP 端口已有 Chrome 在跑,直接 attach (单 Chrome 模式,无 profile 轮转)")
+        elif self.available_profiles:
+            # profile 池模式:自动 spawn profile_1
+            first_profile = self.available_profiles[0]
+            print(f"  CDP 端口空闲,自动启动 profile_{first_profile}...")
+            jd_profile_pool.ensure_chrome_running(first_profile)
+            self.current_profile_id = first_profile
+        else:
+            # 端口空闲 且 profile 池为空 — 用户需要先手动启动 Chrome
+            raise RuntimeError(
+                f"\n{'='*60}\n"
+                f"❌ CDP 端口 {CDP_PORT} 没有 Chrome 在跑,且 profile 池为空.\n\n"
+                f"请二选一:\n"
+                f"  方案 B(用日常 Chrome profile,推荐当前测试):\n"
+                f"    1. 完全关闭日常 Chrome (Command+Q)\n"
+                f"    2. 运行: bash launch_chrome_real_profile.sh\n"
+                f"  方案 profile 池(隔离的独立 profile):\n"
+                f"    bash prepare_jd_profile_pool.sh 3\n"
+                f"{'='*60}\n"
             )
+
+        print(f"  连接到 Chrome (CDP {CDP_ADDR})...")
+        t0 = time.time()
+        try:
+            opts = ChromeOptions()
+            opts.add_experimental_option("debuggerAddress", CDP_ADDR)
+            self.driver = webdriver.Chrome(options=opts, service=ChromeService())
             self.driver.implicitly_wait(5)
-            print(f"  ✓ 浏览器启动成功 ({time.time()-t0:.1f}秒)")
+            print(f"  ✓ 已连接到 Chrome ({time.time()-t0:.1f}秒)")
         except Exception as e:
-            print(f"初始化驱动失败: {str(e)}")
+            print(f"  ✗ CDP attach 失败: {e}")
             raise
+
+    def switch_to_next_profile(self) -> Optional[int]:
+        """切换到下一个 profile.
+        返回新 profile id,如果没有更多 profile 可用 / profile 池为空 返回 None.
+        """
+        if not self.available_profiles:
+            # 单 Chrome 模式:无 profile 池,无法轮转
+            return None
+        if self.current_profile_id is None:
+            next_id = self.available_profiles[0]
+        else:
+            # 找下一个 id
+            try:
+                cur_idx = self.available_profiles.index(self.current_profile_id)
+                next_idx = cur_idx + 1
+                if next_idx >= len(self.available_profiles):
+                    print(f"  ✗ profile 池已耗尽(用到 profile_{self.current_profile_id})")
+                    return None
+                next_id = self.available_profiles[next_idx]
+            except ValueError:
+                next_id = self.available_profiles[0]
+
+        # 解除 selenium 引用
+        self.driver = None
+        self.is_logged_in = False
+
+        # 切 profile
+        try:
+            jd_profile_pool.switch_to_profile(next_id)
+        except Exception as e:
+            print(f"  ✗ 切换 profile 失败: {e}")
+            return None
+
+        self.current_profile_id = next_id
+
+        # 重新 attach
+        try:
+            opts = ChromeOptions()
+            opts.add_experimental_option("debuggerAddress", CDP_ADDR)
+            self.driver = webdriver.Chrome(options=opts, service=ChromeService())
+            self.driver.implicitly_wait(5)
+            print(f"  ✓ attach 到 profile_{next_id}")
+        except Exception as e:
+            print(f"  ✗ attach 失败: {e}")
+            return None
+
+        # 检测登录态(profile 已扫码,应该自动登录)
+        self.login(auto_login=False)
+        if not self.is_logged_in:
+            print(f"  ⚠ profile_{next_id} 未检测到登录态")
+            return None
+
+        return next_id
 
     def load_cookies(self) -> bool:
         """加载cookies"""
@@ -95,86 +204,57 @@ class JDCrawlerViaSearch:
             return False
 
     def login(self, auto_login: bool = True):
-        """
-        登录京东账号
+        """CDP attach 模式:Chrome 是用户启动的,登录态由用户在 Chrome 里手动管理.
+        本方法只做'检测登录态' — 不主动打开登录页(避免打扰用户的 Chrome 操作).
 
         Args:
-            auto_login: 如果 cookies 失效，是否自动引导用户登录
+            auto_login: 检测到未登录时,是否等待用户在 Chrome 里手动登录(最多 3 分钟)
         """
-        # 1. 尝试使用 cookies 登录
-        if self.load_cookies():
-            self.driver.get("https://order.jd.com/center/list.action")
-            time.sleep(3)
-            if "登录" not in self.driver.title and "login" not in self.driver.current_url.lower():
-                print("✓ 使用cookies登录成功")
-                self.is_logged_in = True
-                return
-
-        # 2. Cookies 失效或不存在
-        if not auto_login:
-            print("✗ 登录失败，cookies无效或不存在")
+        # 1. 检测当前是否已登录 — 访问需要登录的页面,看是否被踢到 login
+        if self._is_logged_in_now():
+            print("✓ Chrome 已登录京东")
+            self.is_logged_in = True
             return
 
-        # 3. 引导用户手动登录
-        print("\n" + "=" * 70)
-        print("需要登录京东账号")
-        print("=" * 70)
-        print("\n浏览器将打开京东登录页面，请按以下步骤操作：")
-        print("  1. 在浏览器中登录你的京东账号（推荐扫码登录）")
-        print("  2. 登录成功后，返回终端")
-        print("  3. 按 Enter 键继续\n")
+        # 2. 未登录 — 提示用户在 Chrome 里手动扫码
+        print("\n" + "=" * 60)
+        print("Chrome 中未检测到京东登录态")
+        print("=" * 60)
+        print("请在已打开的 Chrome 窗口中扫码登录京东.")
+        print("登录成功后,本程序会自动检测到并继续爬取.")
+        print("=" * 60)
 
-        try:
-            # 打开京东首页
-            self.driver.get("https://www.jd.com")
-            time.sleep(2)
-
-            # 点击登录按钮
-            try:
-                login_link = self.driver.find_element(By.CLASS_NAME, "link-login")
-                login_link.click()
-                time.sleep(2)
-            except:
-                # 如果找不到登录链接，直接打开登录页
-                self.driver.get("https://passport.jd.com/new/login.aspx")
-                time.sleep(2)
-
-            # 自动检测登录状态（每5秒检查一次，最多等待3分钟）
-            print(">>> 等待登录... (最多等待3分钟)")
-            max_wait = 180  # 3分钟
-            check_interval = 5  # 每5秒检查一次
-            waited = 0
-
-            while waited < max_wait:
-                time.sleep(check_interval)
-                waited += check_interval
-
-                # 检查登录状态
-                try:
-                    self.driver.get("https://order.jd.com/center/list.action")
-                    time.sleep(2)
-
-                    if "登录" not in self.driver.title and "login" not in self.driver.current_url.lower():
-                        print("\n✓ 登录成功！")
-                        self.is_logged_in = True
-
-                        # 保存 cookies
-                        self._save_cookies()
-                        print(f"✓ Cookies 已保存到 {self.cookies_file}")
-                        print("  下次运行将自动登录\n")
-                        break
-                    else:
-                        print(f">>> 等待登录中... ({waited}/{max_wait}秒)")
-                except Exception as e:
-                    print(f">>> 检测登录状态时出错: {e}")
-                    continue
-
-            if not self.is_logged_in:
-                print(f"\n✗ 登录超时（等待了{max_wait}秒）")
-
-        except Exception as e:
-            print(f"\n✗ 登录过程出错: {e}")
+        if not auto_login:
             self.is_logged_in = False
+            return
+
+        # 3. 等待用户在 Chrome 中完成登录(最多 3 分钟)
+        max_wait = 180
+        check_interval = 3
+        waited = 0
+        while waited < max_wait:
+            time.sleep(check_interval)
+            waited += check_interval
+            if self._is_logged_in_now():
+                print(f"\n✓ 检测到登录成功 (等待了 {waited} 秒)")
+                self.is_logged_in = True
+                return
+            if waited % 15 == 0:
+                print(f">>> 等待登录中... ({waited}/{max_wait}秒)")
+
+        print(f"\n✗ 登录超时(等待了 {max_wait} 秒).请确认 Chrome 已登录后重试.")
+        self.is_logged_in = False
+
+    def _is_logged_in_now(self) -> bool:
+        """快速检测当前 Chrome 是否已登录京东."""
+        try:
+            self.driver.get("https://order.jd.com/center/list.action")
+            time.sleep(2)
+            cur = (self.driver.current_url or '').lower()
+            title = self.driver.title or ''
+            return '登录' not in title and 'login' not in cur and 'passport' not in cur
+        except Exception:
+            return False
 
     def _save_cookies(self):
         """保存cookies到文件"""
@@ -188,38 +268,47 @@ class JDCrawlerViaSearch:
             return False
 
     def warmup(self):
-        """登录后模拟正常浏览行为，降低反爬风险"""
-        print("  热身：模拟正常浏览...")
+        """登录后简单浏览首页 — 不做搜索、不访问具体商品,
+        避免在搜索域累积风控分(京东新版风控会因为高频搜索同一词触发"搜索操作过于频繁")."""
+        print("  热身：浏览首页...")
         try:
-            # 1. 浏览京东首页
+            # 仅访问首页 + 滚动模拟人类行为
             self.driver.get("https://www.jd.com")
             time.sleep(random.uniform(3, 5))
             self.driver.execute_script("window.scrollTo(0, 600);")
             time.sleep(random.uniform(1, 2))
+            self.driver.execute_script("window.scrollTo(0, 1200);")
+            time.sleep(random.uniform(1, 2))
             self.driver.execute_script("window.scrollTo(0, 0);")
-            time.sleep(random.uniform(1, 2))
-
-            # 2. 搜索一个热门关键词
-            self.driver.get("https://search.jd.com/Search?keyword=充电宝&enc=utf-8")
-            time.sleep(random.uniform(3, 5))
-            self.driver.execute_script("window.scrollTo(0, 800);")
-            time.sleep(random.uniform(2, 3))
-            self.driver.execute_script("window.scrollTo(0, 1500);")
-            time.sleep(random.uniform(1, 2))
-
-            # 3. 点进一个商品看看（用热门商品）
-            self.driver.get("https://item.jd.com/100015253059.html")
-            time.sleep(random.uniform(3, 5))
-            self.driver.execute_script("window.scrollTo(0, 500);")
-            time.sleep(random.uniform(2, 3))
-
-            # 4. 回到首页
-            self.driver.get("https://www.jd.com")
             time.sleep(random.uniform(2, 3))
 
             print("  ✓ 热身完成")
         except Exception as e:
             print(f"  热身出错（忽略）: {e}")
+
+    def random_walk(self) -> str:
+        """随机游走:在主商品爬取之间插入一次"伪浏览",制造行为多样性
+        访问首页/购物车/我的京东之一,滚动一下,模拟真人在商品页之间切换的行为.
+        返回此次访问的页面描述,用于日志.
+        """
+        # 池子里只放"已登录用户访问不会触发风控"的页面 — 不要触碰 search.jd.com
+        candidates = [
+            ('首页', 'https://www.jd.com'),
+            ('购物车', 'https://cart.jd.com/cart_index/'),
+            ('我的京东', 'https://home.jd.com/'),
+        ]
+        label, target = random.choice(candidates)
+        try:
+            self.driver.get(target)
+            time.sleep(random.uniform(3.0, 5.0))
+            # 滚动一下模拟阅读
+            self.driver.execute_script("window.scrollTo({top: 600, behavior: 'smooth'});")
+            time.sleep(random.uniform(2.0, 3.5))
+            self.driver.execute_script("window.scrollTo({top: 0, behavior: 'smooth'});")
+            time.sleep(random.uniform(1.0, 2.0))
+        except Exception as e:
+            print(f"  随机游走出错(忽略): {e}")
+        return label
 
     def get_price_via_search(self, product_id: str) -> Optional[float]:
         """
@@ -238,29 +327,60 @@ class JDCrawlerViaSearch:
 
             print(f"  直接访问商品页...")
             self.driver.get(product_url)
-            # 等待页面加载 — 随机化避免被检测
-            time.sleep(random.uniform(3.5, 5.0))
 
-            # 模拟人类行为：滚动页面触发懒加载
+            # 模拟真人浏览:平滑滚动到底 + 中间停留 + 滚回中部
+            # 总耗时 10-15 秒,显著降低"机器人式快进快出"的可疑度
             try:
-                self.driver.execute_script("window.scrollTo(0, 300);")
-                time.sleep(0.5)
-                self.driver.execute_script("window.scrollTo(0, 0);")
-            except:
-                pass
+                # 1. 等待页面加载
+                time.sleep(random.uniform(2.0, 3.5))
+
+                # 2. 平滑滚动到底,分 4-5 段,每段间停顿(模拟阅读)
+                try:
+                    scroll_height = self.driver.execute_script("return document.body.scrollHeight;") or 3000
+                except Exception:
+                    scroll_height = 3000
+                steps = random.randint(4, 5)
+                for i in range(1, steps + 1):
+                    target_y = int(scroll_height * i / steps)
+                    self.driver.execute_script(
+                        f"window.scrollTo({{top: {target_y}, behavior: 'smooth'}});"
+                    )
+                    time.sleep(random.uniform(1.2, 2.0))
+
+                # 3. 底部停留(模拟看评论/详情参数)
+                time.sleep(random.uniform(2.0, 3.5))
+
+                # 4. 滚回中部(模拟上下浏览查找信息)
+                mid_y = int(scroll_height * random.uniform(0.3, 0.5))
+                self.driver.execute_script(
+                    f"window.scrollTo({{top: {mid_y}, behavior: 'smooth'}});"
+                )
+                time.sleep(random.uniform(0.8, 1.5))
+            except Exception as e:
+                # 滚动失败不阻断主流程
+                print(f"  (滚动模拟出错,忽略: {e})")
 
             # 检查当前URL - 精确区分不同的失败类型
             current_url = self.driver.current_url
 
+            def _diag():
+                try:
+                    src_len = len(self.driver.page_source or '')
+                except Exception:
+                    src_len = -1
+                title = (self.driver.title or '')[:50]
+                return (f'url="{current_url[:90]}" title="{title}" '
+                        f'src_len={src_len}')
+
             # 1. 检查是否触发反爬验证（需要重试）
             if "risk_handler" in current_url or "verify" in current_url.lower():
-                print(f"  ⚠️  触发反爬验证页面 (可重试)")
-                return {'original': 'blocked', 'promo': 'blocked'}
+                print(f"  ⚠️  触发反爬验证页面 (可重试) | {_diag()}")
+                return {'original': 'blocked', 'promo': 'blocked', '_diag': _diag()}
 
             # 2. 检查是否被重定向到403错误页（反爬拦截）
             if "error" in current_url.lower() and "403" in current_url:
-                print(f"  ⚠️  403错误 - 反爬拦截 (可重试)")
-                return {'original': 'forbidden', 'promo': 'forbidden'}
+                print(f"  ⚠️  403错误 - 反爬拦截 (可重试) | {_diag()}")
+                return {'original': 'forbidden', 'promo': 'forbidden', '_diag': _diag()}
 
             # 3. 被重定向到首页 — 精确区分"商品不存在"和"反爬拦截"
             if current_url.startswith("https://www.jd.com/?") or current_url == "https://www.jd.com/":
@@ -268,8 +388,8 @@ class JDCrawlerViaSearch:
                 if current_url == "https://www.jd.com/?d":
                     print(f"  ✗ 商品不存在或链接失效")
                     return {'original': 'not_found', 'promo': 'not_found'}
-                print(f"  ⚠️  被重定向到首页 (可重试)")
-                return {'original': 'blocked', 'promo': 'blocked'}
+                print(f"  ⚠️  被重定向到首页 (可重试) | {_diag()}")
+                return {'original': 'blocked', 'promo': 'blocked', '_diag': _diag()}
 
             # 检查商品是否已下架
             page_text = self.driver.page_source
@@ -499,57 +619,35 @@ class JDCrawlerViaSearch:
             return False
 
     def restart_browser(self):
-        """重启浏览器并重新登录"""
-        print("\n  ⚠️  检测到浏览器会话失效，正在重启...")
+        """CDP attach 模式 — 重连到已运行的 Chrome(不关闭 Chrome 进程,那是用户的)."""
+        print("\n  ⚠️  会话失效,重连 CDP...")
+        # 不调 quit — driver.quit() 在 attach 模式下可能会关闭 Chrome 标签页,
+        # 直接重新 init_driver 即可建立新的 selenium 会话连到同一 Chrome
+        self.driver = None
+
         try:
-            if self.driver:
-                self.driver.quit()
-        except:
-            pass
+            self._init_driver()
+        except Exception as e:
+            print(f"  ✗ 重连失败: {e}")
+            return False
 
-        # 重新初始化
-        self._init_driver()
-
-        # 重新登录
-        print("  重新登录...")
-        self.login()
-
+        # 检测登录态(Chrome profile 已持久化登录,通常无需扫码)
+        self.login(auto_login=False)
         if self.is_logged_in:
-            print("  ✓ 浏览器重启成功！\n")
+            print("  ✓ 重连成功(登录态已自动恢复)\n")
             return True
         else:
-            print("  ✗ 重新登录失败\n")
+            print("  ✗ 重连后未检测到登录态,请在 Chrome 中检查\n")
             return False
 
     def close(self):
-        """关闭浏览器并清理资源"""
+        """关闭浏览器并清理资源 — attach 模式只断开 selenium 连接,
+        不调 driver.quit()(那会试图关闭 Chrome,但 Chrome 是用户启动的,应该保持)."""
         if self.driver:
-            try:
-                # 先关闭所有窗口
-                self.driver.quit()
-            except:
-                pass
-            finally:
-                # 确保清理
-                self.driver = None
-
-        # 清理可能残留的进程
-        try:
-            import psutil
-            import os
-            current_process = psutil.Process(os.getpid())
-            children = current_process.children(recursive=True)
-            for child in children:
-                try:
-                    if 'chrome' in child.name().lower():
-                        child.terminate()
-                except:
-                    pass
-        except ImportError:
-            # psutil 未安装，跳过
-            pass
-        except:
-            pass
+            # CDP attach 模式:不调 quit,避免误关用户的 Chrome.
+            # 只解除 selenium 对它的引用,让 GC 清理 websocket 连接.
+            self.driver = None
+        # 不杀 chrome 子进程 — 那些是用户启动的 Chrome,需要保留
 
 
 if __name__ == "__main__":

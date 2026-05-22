@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>京东价格爬虫 - Lightning Design</title>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --nav-bg:#032D60;
+  --nav-hover:#164A85;
+  --primary:#0176D3;
+  --primary-dark:#014486;
+  --primary-light:#1B96FF;
+  --surface:#FFFFFF;
+  --bg:#F3F3F3;
+  --border:#C9C9C9;
+  --border-light:#DDDBDA;
+  --text-primary:#181818;
+  --text-secondary:#444444;
+  --text-tertiary:#706E6B;
+  --text-inverse:#FFFFFF;
+  --table-header-bg:#FAFAF9;
+  --table-header-text:#514F4D;
+  --card-header-bg:#F3F3F3;
+  --success:#2E844A;
+  --success-light:#EBF7E6;
+  --error:#BA0517;
+  --error-light:#FEF1EE;
+  --warning:#DD7A01;
+  --warning-light:#FFF8E6;
+  --jd-red:#E84027;
+  --shadow-card:0 2px 4px rgba(0,0,0,0.07);
+  --shadow-dropdown:0 2px 8px rgba(0,0,0,0.16);
+  --radius:4px;
+  --radius-pill:12px;
+}
+html{font-size:13px;line-height:1.5}
+body{
+  font-family:'Lato','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  background:var(--bg);
+  color:var(--text-primary);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ===== GLOBAL NAVIGATION ===== */
+.slds-global-nav{
+  background:var(--nav-bg);
+  height:48px;
+  display:flex;
+  align-items:center;
+  padding:0 16px;
+  position:sticky;
+  top:0;
+  z-index:100;
+  box-shadow:0 2px 4px rgba(0,0,0,0.2);
+}
+.nav-logo{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-right:24px;
+  color:var(--text-inverse);
+  font-weight:700;
+  font-size:15px;
+  letter-spacing:0.3px;
+  white-space:nowrap;
+}
+.nav-logo svg{width:24px;height:24px;fill:var(--text-inverse)}
+.nav-waffle{
+  width:32px;height:32px;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:var(--radius);
+  cursor:pointer;
+  margin-right:12px;
+}
+.nav-waffle:hover{background:var(--nav-hover)}
+.nav-waffle svg{width:20px;height:20px;fill:rgba(255,255,255,0.85)}
+.nav-items{display:flex;height:100%;gap:0}
+.nav-item{
+  display:flex;align-items:center;
+  padding:0 16px;
+  height:100%;
+  color:rgba(255,255,255,0.85);
+  font-size:13px;
+  font-weight:400;
+  cursor:pointer;
+  position:relative;
+  text-decoration:none;
+  transition:background 0.15s;
+}
+.nav-item:hover{background:var(--nav-hover);color:#fff}
+.nav-item.active{color:#fff;font-weight:700}
+.nav-item.active::after{
+  content:'';
+  position:absolute;
+  bottom:0;left:16px;right:16px;
+  height:3px;
+  background:var(--primary-light);
+  border-radius:3px 3px 0 0;
+}
+.nav-right{
+  margin-left:auto;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.nav-icon-btn{
+  width:32px;height:32px;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:var(--radius);
+  cursor:pointer;
+  color:rgba(255,255,255,0.7);
+}
+.nav-icon-btn:hover{background:var(--nav-hover);color:#fff}
+.nav-icon-btn svg{width:18px;height:18px;fill:currentColor}
+.nav-avatar{
+  width:28px;height:28px;
+  border-radius:50%;
+  background:#1B96FF;
+  color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;
+  cursor:pointer;
+}
+
+/* ===== TOAST NOTIFICATION ===== */
+.slds-toast-container{
+  position:fixed;
+  top:56px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:200;
+  animation:toastSlide 0.35s ease-out;
+}
+@keyframes toastSlide{from{opacity:0;transform:translateX(-50%) translateY(-12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.slds-toast{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 20px;
+  border-radius:var(--radius);
+  font-size:13px;
+  color:#fff;
+  min-width:360px;
+  box-shadow:var(--shadow-dropdown);
+}
+.slds-toast--success{background:var(--success)}
+.slds-toast svg{width:18px;height:18px;fill:#fff;flex-shrink:0}
+.slds-toast-close{
+  margin-left:auto;
+  cursor:pointer;
+  opacity:0.8;
+  padding:4px;
+}
+.slds-toast-close:hover{opacity:1}
+
+/* ===== PAGE HEADER ===== */
+.slds-page-header{
+  background:var(--surface);
+  border-bottom:1px solid var(--border-light);
+  padding:12px 24px;
+}
+.page-header-breadcrumb{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-size:12px;
+  color:var(--text-tertiary);
+  margin-bottom:6px;
+}
+.page-header-breadcrumb a{color:var(--primary);text-decoration:none}
+.page-header-breadcrumb a:hover{text-decoration:underline}
+.page-header-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+.page-header-title{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.page-header-title h1{
+  font-size:20px;
+  font-weight:700;
+  color:var(--text-primary);
+  line-height:1.3;
+}
+.page-header-icon{
+  width:36px;height:36px;
+  border-radius:var(--radius);
+  background:var(--primary);
+  display:flex;align-items:center;justify-content:center;
+}
+.page-header-icon svg{width:20px;height:20px;fill:#fff}
+.page-header-meta{
+  font-size:12px;
+  color:var(--text-tertiary);
+  margin-top:2px;
+}
+.page-header-actions{display:flex;gap:8px}
+
+/* ===== BUTTONS ===== */
+.slds-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:0 16px;
+  height:32px;
+  border-radius:var(--radius);
+  font-size:13px;
+  font-weight:400;
+  font-family:inherit;
+  cursor:pointer;
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:var(--text-primary);
+  transition:all 0.12s;
+  white-space:nowrap;
+}
+.slds-btn:hover{background:#F3F3F3}
+.slds-btn svg{width:14px;height:14px;fill:currentColor}
+.slds-btn--brand{
+  background:var(--primary);
+  border-color:var(--primary-dark);
+  color:#fff;
+}
+.slds-btn--brand:hover{background:var(--primary-dark)}
+.slds-btn--brand svg{fill:#fff}
+.slds-btn--destructive{
+  background:var(--error);
+  border-color:#8E030F;
+  color:#fff;
+}
+.slds-btn--destructive:hover{background:#8E030F}
+.slds-btn--success{
+  background:var(--success);
+  border-color:#1D5C31;
+  color:#fff;
+}
+.slds-btn--outline-brand{
+  border-color:var(--primary);
+  color:var(--primary);
+  background:var(--surface);
+}
+.slds-btn--outline-brand:hover{background:#EBF5FE}
+.slds-btn-icon{
+  width:32px;height:32px;
+  padding:0;
+  display:inline-flex;
+  align-items:center;justify-content:center;
+  border-radius:var(--radius);
+  border:1px solid var(--border);
+  background:var(--surface);
+  cursor:pointer;
+  color:var(--text-tertiary);
+}
+.slds-btn-icon:hover{background:#F3F3F3;color:var(--text-primary)}
+.slds-btn-icon svg{width:16px;height:16px;fill:currentColor}
+
+/* ===== MAIN CONTENT LAYOUT ===== */
+.slds-page-content{
+  padding:16px 24px 32px;
+  max-width:1440px;
+  margin:0 auto;
+}
+.slds-grid{
+  display:flex;
+  gap:16px;
+}
+.slds-col-8{flex:0 0 66.666%;max-width:66.666%}
+.slds-col-4{flex:0 0 33.333%;max-width:33.333%}
+
+/* ===== PATH (PROGRESS) ===== */
+.slds-path{
+  display:flex;
+  align-items:stretch;
+  margin-bottom:16px;
+  border-radius:var(--radius);
+  overflow:hidden;
+  border:1px solid var(--border-light);
+  background:var(--surface);
+}
+.slds-path-step{
+  flex:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:10px 16px;
+  font-size:12px;
+  font-weight:700;
+  position:relative;
+  background:var(--surface);
+  color:var(--text-tertiary);
+  text-transform:none;
+  letter-spacing:0.3px;
+  border-right:1px solid var(--border-light);
+}
+.slds-path-step:last-child{border-right:none}
+.slds-path-step.complete{
+  background:var(--success);
+  color:#fff;
+}
+.slds-path-step.current{
+  background:var(--primary);
+  color:#fff;
+}
+.slds-path-step.complete::after,
+.slds-path-step.current::after{
+  content:'';
+  position:absolute;
+  right:-10px;
+  top:50%;
+  transform:translateY(-50%) rotate(45deg);
+  width:18px;height:18px;
+  z-index:2;
+  border-right:1px solid var(--border-light);
+  border-top:1px solid var(--border-light);
+}
+.slds-path-step.complete::after{background:var(--success);border-color:rgba(255,255,255,0.3)}
+.slds-path-step.current::after{background:var(--primary);border-color:rgba(255,255,255,0.3)}
+.slds-path-step .step-check{margin-right:6px}
+.slds-path-step .step-check svg{width:14px;height:14px;fill:#fff}
+
+/* ===== CARD ===== */
+.slds-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  margin-bottom:16px;
+  box-shadow:var(--shadow-card);
+}
+.slds-card-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 16px;
+  border-bottom:1px solid var(--border-light);
+  background:var(--card-header-bg);
+  border-radius:var(--radius) var(--radius) 0 0;
+}
+.slds-card-header-left{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.slds-card-header-icon{
+  width:28px;height:28px;
+  border-radius:var(--radius);
+  display:flex;align-items:center;justify-content:center;
+}
+.slds-card-header-icon.blue{background:var(--primary)}
+.slds-card-header-icon.green{background:var(--success)}
+.slds-card-header-icon.orange{background:var(--warning)}
+.slds-card-header-icon.red{background:var(--jd-red)}
+.slds-card-header-icon svg{width:16px;height:16px;fill:#fff}
+.slds-card-title{
+  font-size:14px;
+  font-weight:700;
+  color:var(--text-primary);
+}
+.slds-card-count{
+  font-size:12px;
+  color:var(--text-tertiary);
+  font-weight:400;
+  margin-left:6px;
+}
+.slds-card-body{padding:16px}
+.slds-card-body--flush{padding:0}
+
+/* ===== TABS ===== */
+.slds-tabs{
+  display:flex;
+  border-bottom:2px solid var(--border-light);
+  padding:0 16px;
+  background:var(--surface);
+  gap:0;
+}
+.slds-tab{
+  padding:10px 16px;
+  font-size:13px;
+  font-weight:400;
+  color:var(--text-tertiary);
+  cursor:pointer;
+  position:relative;
+  transition:color 0.15s;
+}
+.slds-tab:hover{color:var(--text-primary)}
+.slds-tab.active{
+  color:var(--primary);
+  font-weight:700;
+}
+.slds-tab.active::after{
+  content:'';
+  position:absolute;
+  bottom:-2px;
+  left:0;right:0;
+  height:3px;
+  background:var(--primary);
+  border-radius:3px 3px 0 0;
+}
+
+/* ===== PROGRESS BAR ===== */
+.slds-progress-bar-container{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px 16px;
+}
+.slds-progress-bar{
+  flex:1;
+  height:8px;
+  background:#ECEBEA;
+  border-radius:4px;
+  overflow:hidden;
+}
+.slds-progress-bar-fill{
+  height:100%;
+  background:var(--primary);
+  border-radius:4px;
+  transition:width 0.3s;
+}
+.slds-progress-label{
+  font-size:12px;
+  color:var(--text-secondary);
+  font-weight:700;
+  white-space:nowrap;
+}
+
+/* ===== DATA TABLE ===== */
+.slds-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+}
+.slds-table thead th{
+  background:var(--table-header-bg);
+  color:var(--table-header-text);
+  font-size:11px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+  padding:8px 12px;
+  text-align:left;
+  border-bottom:1px solid var(--border-light);
+  position:sticky;
+  top:0;
+  white-space:nowrap;
+  user-select:none;
+}
+.slds-table thead th.sortable{cursor:pointer}
+.slds-table thead th.sortable:hover{background:#ECEBEA;color:var(--text-primary)}
+.slds-table tbody tr{
+  border-bottom:1px solid #F3F3F3;
+  transition:background 0.1s;
+}
+.slds-table tbody tr:hover{background:#F3F3F3}
+.slds-table tbody td{
+  padding:8px 12px;
+  vertical-align:middle;
+  color:var(--text-secondary);
+}
+.slds-table tbody td.text-primary{color:var(--text-primary);font-weight:500}
+.slds-table .col-checkbox{width:32px;text-align:center}
+.slds-table .col-num{width:40px;text-align:center;color:var(--text-tertiary)}
+.slds-table .col-action{width:36px;text-align:center}
+.slds-table .product-link{
+  color:var(--primary);
+  text-decoration:none;
+  cursor:pointer;
+}
+.slds-table .product-link:hover{text-decoration:underline}
+.slds-table .price{
+  font-weight:700;
+  color:var(--jd-red);
+  font-variant-numeric:tabular-nums;
+}
+.slds-table .price-original{
+  color:var(--text-tertiary);
+  text-decoration:line-through;
+  font-size:12px;
+  font-variant-numeric:tabular-nums;
+}
+.slds-table .time{color:var(--text-tertiary);font-size:12px;font-variant-numeric:tabular-nums}
+.slds-checkbox{
+  width:16px;height:16px;
+  border:1px solid var(--border);
+  border-radius:3px;
+  display:inline-flex;
+  align-items:center;justify-content:center;
+  cursor:pointer;
+  background:var(--surface);
+}
+.slds-checkbox.checked{
+  background:var(--primary);
+  border-color:var(--primary);
+}
+.slds-checkbox.checked svg{width:10px;height:10px;fill:#fff}
+.slds-row-action{
+  color:var(--text-tertiary);
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+.slds-row-action:hover{color:var(--text-primary)}
+.slds-row-action svg{width:16px;height:16px;fill:currentColor}
+
+/* ===== BADGES ===== */
+.slds-badge{
+  display:inline-flex;
+  align-items:center;
+  padding:2px 10px;
+  border-radius:var(--radius-pill);
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:0.3px;
+  white-space:nowrap;
+}
+.slds-badge--success{background:var(--success-light);color:var(--success)}
+.slds-badge--error{background:var(--error-light);color:var(--error)}
+.slds-badge--warning{background:var(--warning-light);color:var(--warning)}
+.slds-badge--gray{background:#F3F3F3;color:var(--text-tertiary)}
+
+/* ===== SIDEBAR DETAIL ROWS ===== */
+.detail-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px 0;
+  border-bottom:1px solid #F3F3F3;
+}
+.detail-row:last-child{border-bottom:none}
+.detail-label{
+  font-size:12px;
+  color:var(--text-tertiary);
+  font-weight:400;
+}
+.detail-value{
+  font-size:13px;
+  color:var(--text-primary);
+  font-weight:500;
+  text-align:right;
+}
+.stat-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px 0;
+  border-bottom:1px solid #F3F3F3;
+}
+.stat-row:last-child{border-bottom:none}
+.stat-label{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:13px;
+  color:var(--text-secondary);
+}
+.stat-dot{
+  width:8px;height:8px;
+  border-radius:50%;
+}
+.stat-dot.green{background:var(--success)}
+.stat-dot.red{background:var(--error)}
+.stat-dot.orange{background:var(--warning)}
+.stat-dot.gray{background:var(--text-tertiary)}
+.stat-dot.blue{background:var(--primary)}
+.stat-value{
+  font-size:16px;
+  font-weight:700;
+  font-variant-numeric:tabular-nums;
+}
+
+/* ===== INPUT ===== */
+.slds-form-element{margin-bottom:12px}
+.slds-form-label{
+  display:block;
+  font-size:12px;
+  color:var(--text-secondary);
+  font-weight:700;
+  margin-bottom:4px;
+}
+.slds-input{
+  width:100%;
+  height:32px;
+  padding:0 12px;
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  font-size:13px;
+  font-family:inherit;
+  color:var(--text-primary);
+  background:var(--surface);
+  transition:border-color 0.15s,box-shadow 0.15s;
+}
+.slds-input:focus{
+  outline:none;
+  border-color:var(--primary);
+  box-shadow:0 0 0 3px rgba(1,118,211,0.15);
+}
+.slds-input-group{
+  display:flex;
+  gap:8px;
+}
+.slds-input-group .slds-input{flex:1}
+
+/* ===== LOG ===== */
+.log-container{
+  font-family:'SFMono-Regular','Menlo','Monaco','Consolas',monospace;
+  font-size:12px;
+  line-height:1.8;
+  padding:12px 16px;
+  max-height:240px;
+  overflow-y:auto;
+  background:#FAFAF9;
+}
+.log-line{display:flex;gap:8px;padding:1px 0}
+.log-time{color:var(--text-tertiary);white-space:nowrap;flex-shrink:0}
+.log-level{
+  font-weight:700;
+  width:44px;
+  flex-shrink:0;
+  text-align:center;
+  border-radius:2px;
+  padding:0 4px;
+}
+.log-level.info{color:var(--primary)}
+.log-level.success{color:var(--success)}
+.log-level.warn{color:var(--warning)}
+.log-level.error{color:var(--error)}
+.log-msg{color:var(--text-secondary)}
+
+/* ===== TABLE FOOTER / PAGINATION ===== */
+.slds-table-footer{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px 16px;
+  border-top:1px solid var(--border-light);
+  font-size:12px;
+  color:var(--text-tertiary);
+}
+.slds-pagination{
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+.slds-pagination-btn{
+  width:28px;height:28px;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  background:var(--surface);
+  font-size:12px;
+  color:var(--text-secondary);
+  cursor:pointer;
+}
+.slds-pagination-btn:hover{background:#F3F3F3}
+.slds-pagination-btn.active{
+  background:var(--primary);
+  border-color:var(--primary);
+  color:#fff;
+  font-weight:700;
+}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#C9C9C9;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#A0A0A0}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:1024px){
+  .slds-grid{flex-direction:column}
+  .slds-col-8,.slds-col-4{flex:1 1 100%;max-width:100%}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== GLOBAL NAVIGATION BAR ===== -->
+<nav class="slds-global-nav">
+  <div class="nav-waffle">
+    <svg viewBox="0 0 24 24"><circle cx="4" cy="4" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="20" cy="4" r="2"/><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/><circle cx="4" cy="20" r="2"/><circle cx="12" cy="20" r="2"/><circle cx="20" cy="20" r="2"/></svg>
+  </div>
+  <div class="nav-logo">
+    <svg viewBox="0 0 24 24"><path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18l7 3.5v7.64l-7 3.5-7-3.5V7.68l7-3.5z"/><path d="M12 7v10M7 9.5l5 2.5 5-2.5" stroke="#fff" stroke-width="1.2" fill="none"/></svg>
+    京东价格爬虫
+  </div>
+  <div class="nav-items">
+    <a class="nav-item" href="#">首页</a>
+    <a class="nav-item active" href="#">爬取任务</a>
+    <a class="nav-item" href="#">历史记录</a>
+    <a class="nav-item" href="#">快速查询</a>
+  </div>
+  <div class="nav-right">
+    <div class="nav-icon-btn" title="搜索">
+      <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="7" fill="none" stroke="currentColor" stroke-width="2"/><line x1="15.5" y1="15.5" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </div>
+    <div class="nav-icon-btn" title="通知">
+      <svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+    </div>
+    <div class="nav-icon-btn" title="帮助">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="nav-avatar">王</div>
+  </div>
+</nav>
+
+<!-- ===== TOAST NOTIFICATION ===== -->
+<div class="slds-toast-container">
+  <div class="slds-toast slds-toast--success">
+    <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+    <span>已上传: 商品清单.xlsx &middot; 156个商品</span>
+    <div class="slds-toast-close">
+      <svg viewBox="0 0 24 24" width="14" height="14"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" fill="#fff"/></svg>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAGE HEADER ===== -->
+<div class="slds-page-header">
+  <div class="page-header-breadcrumb">
+    <a href="#">首页</a>
+    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#706E6B" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+    <a href="#">爬取任务</a>
+    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#706E6B" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+    <span>批量价格爬取</span>
+  </div>
+  <div class="page-header-row">
+    <div class="page-header-title">
+      <div class="page-header-icon">
+        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+      </div>
+      <div>
+        <h1>批量价格爬取</h1>
+        <div class="page-header-meta">任务编号 TASK-2026-0409-001 &middot; 创建于 2026-04-09 14:32</div>
+      </div>
+    </div>
+    <div class="page-header-actions">
+      <button class="slds-btn">
+        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        下载结果
+      </button>
+      <button class="slds-btn slds-btn--destructive">
+        <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1" fill="#fff"/></svg>
+        停止爬取
+      </button>
+      <button class="slds-btn slds-btn--brand">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        开始爬取
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MAIN CONTENT ===== -->
+<div class="slds-page-content">
+
+  <!-- PATH / PROGRESS STEPS -->
+  <div class="slds-path">
+    <div class="slds-path-step complete">
+      <span class="step-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg></span>
+      上传文件
+    </div>
+    <div class="slds-path-step complete">
+      <span class="step-check"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg></span>
+      开始爬取
+    </div>
+    <div class="slds-path-step current">
+      爬取中
+    </div>
+    <div class="slds-path-step">
+      完成
+    </div>
+  </div>
+
+  <div class="slds-grid">
+
+    <!-- ===== LEFT COLUMN (2/3) ===== -->
+    <div class="slds-col-8">
+
+      <!-- TABS + TABLE CARD -->
+      <div class="slds-card">
+        <div class="slds-tabs">
+          <div class="slds-tab">数据预览</div>
+          <div class="slds-tab active">爬取结果</div>
+          <div class="slds-tab">运行日志</div>
+          <div class="slds-tab">历史记录</div>
+        </div>
+
+        <!-- PROGRESS BAR -->
+        <div class="slds-progress-bar-container">
+          <span class="slds-progress-label">进度: 82 / 156</span>
+          <div class="slds-progress-bar">
+            <div class="slds-progress-bar-fill" style="width:52.6%"></div>
+          </div>
+          <span class="slds-progress-label">52%</span>
+        </div>
+
+        <!-- DATA TABLE -->
+        <div class="slds-card-body--flush" style="overflow-x:auto">
+          <table class="slds-table">
+            <thead>
+              <tr>
+                <th class="col-checkbox"><div class="slds-checkbox"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#0176D3"/></svg></div></th>
+                <th class="col-num sortable">#</th>
+                <th class="sortable">商品ID</th>
+                <th class="sortable">商品名称</th>
+                <th class="sortable">状态</th>
+                <th class="sortable" style="text-align:right">原价</th>
+                <th class="sortable" style="text-align:right">促销价</th>
+                <th class="sortable">爬取时间</th>
+                <th class="col-action"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="col-checkbox"><div class="slds-checkbox checked"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div></td>
+                <td class="col-num">1</td>
+                <td class="text-primary">100086432178</td>
+                <td><a class="product-link">Apple iPhone 15 Pro Max 256GB 原色钛金属</a></td>
+                <td><span class="slds-badge slds-badge--success">成功</span></td>
+                <td style="text-align:right" class="price-original">¥9,999.00</td>
+                <td style="text-align:right" class="price">¥8,999.00</td>
+                <td class="time">14:35:02</td>
+                <td class="col-action"><div class="slds-row-action"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></div></td>
+              </tr>
+              <tr>
+                <td class="col-checkbox"><div class="slds-checkbox checked"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div></td>
+                <td class="col-num">2</td>
+                <td class="text-primary">100052689431</td>
+                <td><a class="product-link">华为 Mate 60 Pro 12GB+512GB 雅丹黑</a></td>
+                <td><span class="slds-badge slds-badge--success">成功</span></td>
+                <td style="text-align:right" class="price-original">¥6,999.00</td>
+                <td style="text-align:right" class="price">¥6,499.00</td>
+                <td class="time">14:35:05</td>
+                <td class="col-action"><div class="slds-row-action"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></div></td>
+              </tr>
+              <tr>
+                <td class="col-checkbox"><div class="slds-checkbox"></div></td>
+                <td class="col-num">3</td>
+                <td class="text-primary">100098761234</td>
+                <td><a class="product-link">小米14 Ultra 16GB+512GB 龙晶蓝</a></td>
+                <td><span class="slds-badge slds-badge--success">成功</span></td>
+                <td style="text-align:right" class="price-original">¥5,999.00</td>
+                <td style="text-align:right" class="price">¥5,699.00</td>
+                <td class="time">14:35:08</td>
+                <td class="col-action"><div class="slds-row-action"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></div></td>
+              </tr>
+              <tr>
+                <td class="col-checkbox"><div class="slds-checkbox"></div></td>
+                <td class="col-num">4</td>
+                <td class="text-primary">100034127865</td>
+                <td><a class="product-link">戴森 V15 Detect Total Clean 无绳吸尘器</a></td>
+                <td><span class="slds-badge slds-badge--success">成功</span></td>
+                <td style="text-align:right" class="price-original">¥4,990.00</td>
+                <td style="text-align:right" class="price">¥4,290.00</td>
+                <td class="time">14:35:11</td>
+                <td class="col-action"><div class="slds-row-action"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></div></td>
+              </tr>
+              <tr>
+                <td class="col-checkbox"><div class="slds-checkbox"></div></td>
+                <td class="col-num">5</td>
+                <td class="text-primary">100078456321</td>
+                <td><a class="product-link">Sony WH-1000XM5 无线降噪头戴式耳机 黑色</a></td>
+                <td><span class="slds-badge slds-badge--error">失败</span></td>
+                <td style="text-align:right" class="price-original">—</td>
+                <td style="text-align:right" style="color:var(--text-tertiary)">—</td>
+                <td class="time">14:35:14</td>
+                <td class="col-action"><div class="slds-row-action"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></div></td>
+              </tr>
+              <tr>
+                <td class="col-checkbox"><div class="slds-checkbox"></div></td>
+                <td class="col-num">6</td>
+                <td class="text-primary">100023498712</td>
+                <td><a class="product-link">海尔 BCD-510WDPZ 对开门冰箱 变频一级</a></td>
+                <td><span class="slds-badge slds-badge--success">成功</span></td>
+                <td style="text-align:right" class="price-original">¥4,599.00</td>
+                <td style="text-align:right" class="price">¥3,799.00</td>
+                <td class="time">14:35:17</td>
+                <td class="col-action"><div class="slds-row-action"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></div></td>
+              </tr>
+              <tr>
+                <td class="col-checkbox"><div class="slds-checkbox"></div></td>
+                <td class="col-num">7</td>
+                <td class="text-primary">100045672389</td>
+                <td><a class="product-link">格力 KFR-35GW 大1.5匹新一级变频空调</a></td>
+                <td><span class="slds-badge slds-badge--warning">已下架</span></td>
+                <td style="text-align:right" class="price-original">—</td>
+                <td style="text-align:right" style="color:var(--text-tertiary)">—</td>
+                <td class="time">14:35:20</td>
+                <td class="col-action"><div class="slds-row-action"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></div></td>
+              </tr>
+              <tr>
+                <td class="col-checkbox"><div class="slds-checkbox"></div></td>
+                <td class="col-num">8</td>
+                <td class="text-primary">100067891234</td>
+                <td><a class="product-link">联想 ThinkPad X1 Carbon Gen 11 i7 16G 512G</a></td>
+                <td><span class="slds-badge slds-badge--success">成功</span></td>
+                <td style="text-align:right" class="price-original">¥12,999.00</td>
+                <td style="text-align:right" class="price">¥10,499.00</td>
+                <td class="time">14:35:23</td>
+                <td class="col-action"><div class="slds-row-action"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></div></td>
+              </tr>
+              <tr>
+                <td class="col-checkbox"><div class="slds-checkbox"></div></td>
+                <td class="col-num">9</td>
+                <td class="text-primary">100089012345</td>
+                <td><a class="product-link">美的 MC-JCN30A3 电饭煲 3L IH加热</a></td>
+                <td><span class="slds-badge slds-badge--success">成功</span></td>
+                <td style="text-align:right" class="price-original">¥599.00</td>
+                <td style="text-align:right" class="price">¥459.00</td>
+                <td class="time">14:35:26</td>
+                <td class="col-action"><div class="slds-row-action"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></div></td>
+              </tr>
+              <tr>
+                <td class="col-checkbox"><div class="slds-checkbox"></div></td>
+                <td class="col-num">10</td>
+                <td class="text-primary">100012345678</td>
+                <td><a class="product-link">三星 Galaxy S24 Ultra 12GB+256GB 钛灰色</a></td>
+                <td><span class="slds-badge slds-badge--gray">被拦截</span></td>
+                <td style="text-align:right" class="price-original">—</td>
+                <td style="text-align:right" style="color:var(--text-tertiary)">—</td>
+                <td class="time">14:35:29</td>
+                <td class="col-action"><div class="slds-row-action"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></div></td>
+              </tr>
+              <tr>
+                <td class="col-checkbox"><div class="slds-checkbox"></div></td>
+                <td class="col-num">11</td>
+                <td class="text-primary">100056781234</td>
+                <td><a class="product-link">飞利浦 Sonicare 9900 电动牙刷 旗舰款</a></td>
+                <td><span class="slds-badge slds-badge--success">成功</span></td>
+                <td style="text-align:right" class="price-original">¥1,999.00</td>
+                <td style="text-align:right" class="price">¥1,599.00</td>
+                <td class="time">14:35:32</td>
+                <td class="col-action"><div class="slds-row-action"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></div></td>
+              </tr>
+              <tr>
+                <td class="col-checkbox"><div class="slds-checkbox"></div></td>
+                <td class="col-num">12</td>
+                <td class="text-primary">100034569871</td>
+                <td><a class="product-link">大疆 DJI Mini 4 Pro 畅飞套装 含RC 2遥控器</a></td>
+                <td><span class="slds-badge slds-badge--success">成功</span></td>
+                <td style="text-align:right" class="price-original">¥6,388.00</td>
+                <td style="text-align:right" class="price">¥5,788.00</td>
+                <td class="time">14:35:35</td>
+                <td class="col-action"><div class="slds-row-action"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- TABLE FOOTER -->
+        <div class="slds-table-footer">
+          <span>显示 1-12 / 共 82 条记录</span>
+          <div class="slds-pagination">
+            <div class="slds-pagination-btn">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            </div>
+            <div class="slds-pagination-btn active">1</div>
+            <div class="slds-pagination-btn">2</div>
+            <div class="slds-pagination-btn">3</div>
+            <div class="slds-pagination-btn">4</div>
+            <div class="slds-pagination-btn">...</div>
+            <div class="slds-pagination-btn">7</div>
+            <div class="slds-pagination-btn">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOG CARD -->
+      <div class="slds-card">
+        <div class="slds-card-header">
+          <div class="slds-card-header-left">
+            <div class="slds-card-header-icon blue">
+              <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/><path d="M7 10h2v2H7zm0 4h2v2H7zm4-4h6v2h-6zm0 4h6v2h-6z"/></svg>
+            </div>
+            <span class="slds-card-title">运行日志<span class="slds-card-count">(42 条)</span></span>
+          </div>
+          <button class="slds-btn" style="height:28px;font-size:12px;padding:0 12px">
+            <svg viewBox="0 0 24 24" width="12" height="12"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"/></svg>
+            导出日志
+          </button>
+        </div>
+        <div class="log-container">
+          <div class="log-line"><span class="log-time">14:32:01</span><span class="log-level info">INFO</span><span class="log-msg">系统初始化完成，ChromeDriver 版本 126.0.6478.63</span></div>
+          <div class="log-line"><span class="log-time">14:32:03</span><span class="log-level info">INFO</span><span class="log-msg">已加载文件: 商品清单.xlsx，共 156 个商品ID</span></div>
+          <div class="log-line"><span class="log-time">14:32:05</span><span class="log-level info">INFO</span><span class="log-msg">开始爬取任务，并发数: 3，延迟: 2-4秒</span></div>
+          <div class="log-line"><span class="log-time">14:33:12</span><span class="log-level success">OK</span><span class="log-msg">[1/156] 100086432178 Apple iPhone 15 Pro Max - ¥8,999.00</span></div>
+          <div class="log-line"><span class="log-time">14:33:18</span><span class="log-level success">OK</span><span class="log-msg">[2/156] 100052689431 华为 Mate 60 Pro - ¥6,499.00</span></div>
+          <div class="log-line"><span class="log-time">14:34:02</span><span class="log-level warn">WARN</span><span class="log-msg">[5/156] 100078456321 请求超时，正在重试 (1/3)...</span></div>
+          <div class="log-line"><span class="log-time">14:34:08</span><span class="log-level error">ERR</span><span class="log-msg">[5/156] 100078456321 三次重试均失败: Connection timeout</span></div>
+          <div class="log-line"><span class="log-time">14:34:45</span><span class="log-level warn">WARN</span><span class="log-msg">[7/156] 100045672389 商品已下架 (HTTP 404)</span></div>
+          <div class="log-line"><span class="log-time">14:35:20</span><span class="log-level warn">WARN</span><span class="log-msg">[10/156] 100012345678 检测到反爬机制，等待 15 秒后重试</span></div>
+          <div class="log-line"><span class="log-time">14:35:35</span><span class="log-level info">INFO</span><span class="log-msg">当前进度: 82/156 (52.6%) | 成功: 68 | 失败: 8 | 下架: 6</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===== RIGHT COLUMN (1/3) ===== -->
+    <div class="slds-col-4">
+
+      <!-- DETAILS CARD -->
+      <div class="slds-card">
+        <div class="slds-card-header">
+          <div class="slds-card-header-left">
+            <div class="slds-card-header-icon blue">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h5v7h7v9H6z"/></svg>
+            </div>
+            <span class="slds-card-title">详情</span>
+          </div>
+        </div>
+        <div class="slds-card-body">
+          <div class="detail-row">
+            <span class="detail-label">文件名</span>
+            <span class="detail-value">商品清单.xlsx</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">商品数量</span>
+            <span class="detail-value">156</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">开始时间</span>
+            <span class="detail-value">2026-04-09 14:32</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">已用时间</span>
+            <span class="detail-value">00:03:35</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">预计剩余</span>
+            <span class="detail-value">00:03:12</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">当前进度</span>
+            <span class="detail-value" style="color:var(--primary);font-weight:700">82 / 156 (52%)</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">并发数</span>
+            <span class="detail-value">3</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">状态</span>
+            <span class="slds-badge slds-badge--success" style="font-size:12px">运行中</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATISTICS CARD -->
+      <div class="slds-card">
+        <div class="slds-card-header">
+          <div class="slds-card-header-left">
+            <div class="slds-card-header-icon green">
+              <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+            </div>
+            <span class="slds-card-title">统计</span>
+          </div>
+        </div>
+        <div class="slds-card-body">
+          <div class="stat-row">
+            <span class="stat-label"><span class="stat-dot green"></span>成功</span>
+            <span class="stat-value" style="color:var(--success)">98</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label"><span class="stat-dot red"></span>失败</span>
+            <span class="stat-value" style="color:var(--error)">12</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label"><span class="stat-dot orange"></span>已下架</span>
+            <span class="stat-value" style="color:var(--warning)">8</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label"><span class="stat-dot blue"></span>合计</span>
+            <span class="stat-value" style="color:var(--primary)">118</span>
+          </div>
+
+          <!-- Mini progress visualization -->
+          <div style="margin-top:16px">
+            <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:#ECEBEA">
+              <div style="width:63%;background:var(--success)"></div>
+              <div style="width:8%;background:var(--error)"></div>
+              <div style="width:5%;background:var(--warning)"></div>
+              <div style="width:24%;background:#ECEBEA"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--text-tertiary)">
+              <span>已完成 118</span>
+              <span>剩余 38</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUICK CHECK CARD -->
+      <div class="slds-card">
+        <div class="slds-card-header">
+          <div class="slds-card-header-left">
+            <div class="slds-card-header-icon orange">
+              <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="7" fill="none" stroke="#fff" stroke-width="2"/><line x1="15.5" y1="15.5" x2="20" y2="20" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+            </div>
+            <span class="slds-card-title">快速查询</span>
+          </div>
+        </div>
+        <div class="slds-card-body">
+          <div class="slds-form-element">
+            <label class="slds-form-label">商品ID</label>
+            <div class="slds-input-group">
+              <input type="text" class="slds-input" placeholder="输入京东商品ID..." value="100086432178">
+              <button class="slds-btn slds-btn--brand" style="flex-shrink:0">查询</button>
+            </div>
+          </div>
+
+          <!-- Quick result preview -->
+          <div style="background:var(--table-header-bg);border:1px solid var(--border-light);border-radius:var(--radius);padding:12px;margin-top:4px">
+            <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:8px">查询结果</div>
+            <div style="font-size:13px;font-weight:500;color:var(--text-primary);margin-bottom:4px">Apple iPhone 15 Pro Max 256GB</div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px">
+              <div>
+                <div style="font-size:11px;color:var(--text-tertiary)">原价</div>
+                <div class="price-original" style="font-size:14px">¥9,999.00</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:11px;color:var(--text-tertiary)">促销价</div>
+                <div style="font-size:18px;font-weight:700;color:var(--jd-red)">¥8,999.00</div>
+              </div>
+            </div>
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-light);font-size:11px;color:var(--text-tertiary)">
+              <span class="slds-badge slds-badge--success" style="font-size:10px;margin-right:6px">有货</span>
+              更新于 2026-04-09 14:35:02
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- UPLOAD CARD -->
+      <div class="slds-card">
+        <div class="slds-card-header">
+          <div class="slds-card-header-left">
+            <div class="slds-card-header-icon red">
+              <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
+            </div>
+            <span class="slds-card-title">上传文件</span>
+          </div>
+        </div>
+        <div class="slds-card-body">
+          <div style="border:2px dashed var(--border);border-radius:var(--radius);padding:24px;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s" onmouseover="this.style.borderColor='var(--primary)';this.style.background='#F7FBFE'" onmouseout="this.style.borderColor='var(--border)';this.style.background='transparent'">
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="var(--text-tertiary)"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+            <div style="margin-top:8px;font-size:13px;color:var(--text-secondary)">拖放文件到此处或点击上传</div>
+            <div style="margin-top:4px;font-size:11px;color:var(--text-tertiary)">支持 .xlsx, .xls, .csv 格式</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
