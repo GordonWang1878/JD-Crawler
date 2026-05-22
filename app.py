@@ -644,11 +644,10 @@ def process_single_row(crawler, input_row, idx, total, batch_time):
     global is_crawling
 
     url = str(input_row.get('url', ''))
-    product_id = input_row.get('product_id', '')
-    if not product_id:
-        m = re.search(r'/(\d+)\.html', url)
-        if m:
-            product_id = m.group(1)
+    # 始终从 URL 解析 product_id — 不信任 Excel 里的 ProductKey 列
+    # (那列经常被污染成 "ID|商品名" 的脏数据,且本来就是另一个系统的 ID)
+    m = re.search(r'/(\d+)\.html', url)
+    product_id = m.group(1) if m else ''
 
     if not product_id:
         emit_log('WARNING', f'[{idx}/{total}] Cannot extract product ID: {url}')
@@ -898,11 +897,8 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
                         for sk_row in remaining_rows:
                             global_idx += 1
                             sk_url = str(sk_row.get('url', ''))
-                            sk_pid = sk_row.get('product_id', '')
-                            if not sk_pid:
-                                m = re.search(r'/(\d+)\.html', sk_url)
-                                if m:
-                                    sk_pid = m.group(1)
+                            m = re.search(r'/(\d+)\.html', sk_url)
+                            sk_pid = m.group(1) if m else ''
                             skipped = {
                                 'index': global_idx,
                                 'platform': 'jd',

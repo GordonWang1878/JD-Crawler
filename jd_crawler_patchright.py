@@ -220,6 +220,50 @@ class JDCrawlerViaSearch:
 
     # ============ Get Price (核心) ============
 
+    def _navigate_via_click(self, target_url: str, timeout_ms: int = 20000):
+        """模拟真人点击链接到达目标页 — 携带 user activation flag + link_clicked 导航类型,
+        绕过 page.goto() 直接程序化导航被 JD 累积检测的问题."""
+        # 当前页若是风控/403/空白,先回首页拿个干净起点
+        current = (self._page.url or '').lower()
+        bad = ('reason=403', 'risk_handler', 'verify', 'about:blank')
+        if any(s in current for s in bad) or 'jd.com' not in current:
+            self._page.goto('https://www.jd.com',
+                            wait_until='domcontentloaded', timeout=10000)
+            time.sleep(random.uniform(1.5, 2.5))
+
+        # 注入一个不可见但可点击的链接
+        link_id = f"__cl_{int(time.time() * 1000) % 1000000}__"
+        try:
+            self._page.evaluate(
+                """({lid, url}) => {
+                    const old = document.getElementById(lid);
+                    if (old) old.remove();
+                    const a = document.createElement('a');
+                    a.id = lid;
+                    a.href = url;
+                    a.textContent = '\\u00A0';
+                    a.style.cssText = 'position:fixed;top:80px;left:80px;width:40px;height:20px;z-index:2147483647;background:transparent;';
+                    document.body.appendChild(a);
+                }""",
+                {"lid": link_id, "url": target_url},
+            )
+        except Exception as e:
+            print(f"  ⚠️ 注入链接失败,回退 goto: {e}")
+            self._page.goto(target_url, referer='https://www.jd.com/',
+                            wait_until='domcontentloaded', timeout=timeout_ms)
+            return
+
+        # 真实鼠标 hover + click(带按下->抬起延迟),触发 user activation
+        try:
+            with self._page.expect_navigation(
+                    wait_until='domcontentloaded', timeout=timeout_ms):
+                self._page.locator(f'#{link_id}').click(
+                    delay=random.randint(40, 120))
+        except Exception as e:
+            print(f"  ⚠️ 点击导航失败,回退 goto: {e}")
+            self._page.goto(target_url, referer='https://www.jd.com/',
+                            wait_until='domcontentloaded', timeout=timeout_ms)
+
     def get_price_via_search(self, product_id: str) -> Optional[dict]:
         """访问商品页提取价格."""
         if not self.is_logged_in:
@@ -230,7 +274,7 @@ class JDCrawlerViaSearch:
 
         try:
             print(f"  访问商品页 {product_id}...")
-            self._page.goto(product_url, wait_until="domcontentloaded", timeout=20000)
+            self._navigate_via_click(product_url, timeout_ms=20000)
 
             # 模拟真人浏览:等加载 → 平滑滚动到底 → 停留 → 滚回中部
             time.sleep(random.uniform(2.0, 3.5))
