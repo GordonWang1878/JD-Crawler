@@ -364,6 +364,38 @@ body {
 .qc-result .qv.ok { color: var(--cinnabar); }
 .qc-result .qv.err { color: var(--ink-faint); }
 
+/* Reset Browser — 故障恢复区,醒目独立 */
+.reset-section {
+  padding: 14px;
+  border: 1px dashed var(--gold);
+  background: rgba(196,154,76,0.04);
+  border-radius: 2px;
+}
+.reset-section .sec-label { margin-bottom: 10px; }
+.btn-reset {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  letter-spacing: 2px;
+  padding: 11px 14px;
+  background: var(--gold);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-reset svg { width:14px; height:14px; flex-shrink:0; }
+.btn-reset:hover:not(:disabled) { background: var(--gold-light, #b89653); }
+.btn-reset:disabled { background: var(--xuan-dark); color: var(--ink-faint); cursor: not-allowed; }
+.reset-hint {
+  margin-top: 10px;
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  line-height: 1.55;
+}
+.reset-hint strong { color: var(--cinnabar); font-weight: 600; }
+
 /* Progress */
 .progress-box { display: none; flex-direction: column; gap: 6px; }
 .progress-box.vis { display: flex; animation: fadeUp 0.3s ease-out; }
@@ -822,6 +854,19 @@ body {
       <div class="qr"><span class="ql">促销价</span><span id="qc-promo" class="qv">-</span></div>
       <div class="qr"><span class="ql">状态</span><span id="qc-status" class="qv">-</span></div>
     </div>
+
+    <!-- 故障恢复 — 低频但醒目,放在左栏最底 -->
+    <div class="sec-gap" style="margin-top:32px;"></div>
+    <div class="reset-section fade-in fd3">
+      <div class="sec-label" style="color:var(--gold);">故障恢复</div>
+      <button id="btn-reset-browser" class="btn-reset">
+        <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M2 6.5Q2 3 6 3Q8 3 9.5 4.5L11 3M11 3L11 6M11 3L8 3"/><path d="M11 6.5Q11 10 7 10Q5 10 3.5 8.5L2 10M2 10L2 7M2 10L5 10"/></svg>
+        重置浏览器会话
+      </button>
+      <div class="reset-hint">
+        看到 <strong>❌ 热身失败</strong>、长时间空闲后再开爬、或关过 chromium 窗口时,点这里清掉旧会话。
+      </div>
+    </div>
   </div>
 
   <!-- Right Panel -->
@@ -1242,6 +1287,29 @@ body {
 
   $('btn-stop').addEventListener('click', () => {
     fetch('/api/crawl/stop', { method: 'POST' }).then(() => { show($('btn-start')); hide($('btn-stop')); });
+  });
+
+  $('btn-reset-browser').addEventListener('click', () => {
+    const btn = $('btn-reset-browser');
+    btn.disabled = true;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '正在重置...';
+    fetch('/api/reset_browser', { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        if (data.success) {
+          appendLog({ timestamp: now(), level: 'INFO', message: '🔄 ' + data.message });
+        } else {
+          appendLog({ timestamp: now(), level: 'ERROR', message: data.error || '重置失败' });
+        }
+      })
+      .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        appendLog({ timestamp: now(), level: 'ERROR', message: '重置失败: ' + err });
+      });
   });
 
   $('btn-download').addEventListener('click', () => {

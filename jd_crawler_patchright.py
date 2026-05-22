@@ -169,8 +169,9 @@ class JDCrawlerViaSearch:
 
     # ============ Warmup ============
 
-    def warmup(self):
-        """登录后浏览首页 + 滚动,模拟正常用户."""
+    def warmup(self) -> tuple[bool, str]:
+        """登录后浏览首页 + 滚动,模拟正常用户.
+        返回 (ok, error_msg). ok=False 时调用方应中止本次爬取."""
         print("  热身：浏览首页...")
         try:
             self._page.goto("https://www.jd.com", wait_until="domcontentloaded", timeout=15000)
@@ -182,8 +183,11 @@ class JDCrawlerViaSearch:
             self._smooth_scroll(0.0)
             time.sleep(random.uniform(2, 3))
             print("  ✓ 热身完成")
+            return True, ""
         except Exception as e:
-            print(f"  热身出错(忽略): {e}")
+            err = str(e)
+            print(f"  ⚠ 热身出错: {err}")
+            return False, err
 
     def _smooth_scroll(self, ratio: float):
         """平滑滚动到页面高度的 ratio 位置(0.0=顶, 1.0=底)."""
@@ -436,11 +440,14 @@ class JDCrawlerViaSearch:
     # ============ Session 管理 ============
 
     def is_session_valid(self) -> bool:
-        """检查 context/page 是否还活着."""
+        """检查 context/page 是否还活着.
+        必须做一次真实的 playwright 调用 — `self._page.url` 是 Python 端缓存属性,
+        playwright 工作线程死了它还能返回旧值,会假阳性.evaluate() 走 CDP,
+        死线程会立刻抛 'cannot switch to a different thread'."""
         if not self._page or not self._context:
             return False
         try:
-            _ = self._page.url
+            _ = self._page.evaluate("1")
             return True
         except Exception:
             return False

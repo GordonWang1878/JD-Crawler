@@ -29,6 +29,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'jd-crawler-simple-2025'
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['OUTPUT_FOLDER'] = 'outputs'
+app.config['TEMPLATES_AUTO_RELOAD'] = True  # 改 templates/*.html 不用重启 Flask
 
 # 确保目录存在
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -454,6 +455,53 @@ def api_crawl_stop():
     is_crawling = False
     return jsonify({'success': True, 'message': 'Crawling stopped'})
 
+@app.route('/api/reset_browser', methods=['POST'])
+def api_reset_browser():
+    """重置浏览器会话 — 关掉残留 chromium + 清空 crawler 单例.
+    用户点这个按钮等价于"在终端 kill Flask 再重启"的效果,但不杀 Flask 本身.
+    下次开始爬取时会重新初始化一个全新的 patchright + chromium."""
+    global crawler_instance, tmall_crawler_instance, is_crawling
+
+    if is_crawling:
+        return jsonify({
+            'success': False,
+            'error': '当前正在爬取,请先点"停止"再重置',
+        }), 400
+
+    # 关老 context (best effort — playwright 线程可能已死,会抛 thread error,吞掉)
+    for inst_name in ('crawler_instance', 'tmall_crawler_instance'):
+        inst = globals().get(inst_name)
+        if inst is None:
+            continue
+        try:
+            close_fn = getattr(inst, '_close_context', None) or getattr(inst, 'close', None)
+            if close_fn:
+                close_fn()
+        except Exception:
+            pass
+
+    crawler_instance = None
+    tmall_crawler_instance = None
+
+    # 强力清理:杀掉所有 patchright/Chromium for Testing 进程,以及 chromedriver
+    import subprocess
+    killed = []
+    for pattern in ('Chromium', 'chrome_crashpad', 'chromedriver'):
+        try:
+            r = subprocess.run(['pkill', '-9', '-f', pattern], capture_output=True)
+            if r.returncode == 0:
+                killed.append(pattern)
+        except Exception:
+            pass
+
+    return jsonify({
+        'success': True,
+        'message': (
+            f'浏览器会话已重置 — 下次点"开始爬取"会重新初始化一个干净的 chromium。'
+            f'{"已清理: " + ", ".join(killed) if killed else ""}'
+        ),
+    })
+
 @app.route('/api/download/<filename>')
 def api_download(filename):
     """下载结果文件"""
@@ -776,7 +824,28 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
 
         # 热身：模拟正常浏览降低反爬风险
         emit_log('INFO', '正在热身（模拟正常浏览）...')
-        crawler.warmup()
+        warmup_ok, warmup_err = crawler.warmup()
+
+        # 热身后再做一次"真探活" — playwright 线程死了 / chromium 进程没了
+        # 这种深层问题用 warmup_ok 检测不到(warmup 内部捕获后就 swallowed 了)
+        if not warmup_ok or not crawler.is_session_valid():
+            emit_log('ERROR', '❌ 热身失败 — 浏览器会话已失效,无法继续爬取')
+            if warmup_err:
+                emit_log('ERROR', f'   底层错误: {warmup_err}')
+            emit_log('ERROR',
+                     '   常见原因: Flask 长时间空闲后 patchright 工作线程退出,'
+                     '或者上一次跑完后 chromium 进程已被关闭')
+            emit_log('ERROR',
+                     '   解决方法: 在终端运行 `lsof -ti :5001 | xargs kill -9` 杀掉 Flask,'
+                     '然后 `python3 app.py` 重启,再点开始爬取')
+            # 同时把缓存的 crawler_instance 清掉,下次启动会强制重新 init
+            crawler_instance = None
+            is_crawling = False
+            socketio.emit('crawl_complete', {
+                'success': False,
+                'error': '热身失败:浏览器会话已失效,请重启 Flask 后重试',
+            })
+            return
 
         batch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         start_time = time.time()
