@@ -969,6 +969,9 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
 
         global_idx = 0
         user_stopped = False
+        # 一旦发现无法账号交替(只有 1 个可用账号),本次任务后续直接走冷却,
+        # 不再每批反复尝试 rotate(避免对登录过期的 profile 反复 close/launch 的无谓 churn)
+        single_account_mode = False
 
         for batch_idx, chunk in enumerate(chunks, 1):
             if not is_crawling:
@@ -1115,14 +1118,33 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
                 # 这里只额外加少量间隔(2-4s)用于模拟"看完一个商品后切到下一个"的过渡
                 time.sleep(random.uniform(2.0, 4.0))
 
-            # 批次间冷却(最后一批跳过)
+            # 批次间:优先「账号交替」——切到下一个账号继续,用对方那批的时长填掉冷却空窗(免等)。
+            # 只在两种情况下才真正冷却:① 上一批 profile 池耗尽(全员被风控,需自愈时间);
+            # ② 只剩 1 个可用账号(无从交替,退回已验证的 600s)。冷却值绝不缩水。
             if batch_idx < total_batches and is_crawling:
-                emit_log('INFO',
-                         f'✓ 第 {batch_idx}/{total_batches} 批完成 — '
-                         f'冷却 {batch_cooldown//60} 分钟后继续下一批')
-                if not _batch_cooldown(batch_cooldown, platform='jd'):
-                    user_stopped = True
-                    break
+                if crawler.current_profile_id is None:
+                    # 池耗尽:给所有账号自愈时间
+                    emit_log('INFO',
+                             f'✓ 第 {batch_idx}/{total_batches} 批完成(账号池耗尽)— '
+                             f'冷却 {batch_cooldown//60} 分钟后继续')
+                    if not _batch_cooldown(batch_cooldown, platform='jd'):
+                        user_stopped = True
+                        break
+                else:
+                    new_pid = None if single_account_mode else crawler.rotate_profile()
+                    if new_pid is not None:
+                        emit_log('INFO',
+                                 f'✓ 第 {batch_idx}/{total_batches} 批完成 — '
+                                 f'切到 profile_{new_pid} 继续(账号交替,免冷却)')
+                    else:
+                        # 只有 1 个可用账号 → 用验证过的 600s,不缩水;并记住,后续不再尝试交替
+                        single_account_mode = True
+                        emit_log('INFO',
+                                 f'✓ 第 {batch_idx}/{total_batches} 批完成 — '
+                                 f'仅 1 个可用账号,冷却 {batch_cooldown//60} 分钟后继续')
+                        if not _batch_cooldown(batch_cooldown, platform='jd'):
+                            user_stopped = True
+                            break
 
         if user_stopped:
             emit_log('WARNING', 'Crawl stopped by user')

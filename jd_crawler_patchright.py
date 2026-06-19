@@ -503,6 +503,45 @@ class JDCrawlerViaSearch:
             return None
         return next_id
 
+    def rotate_profile(self) -> Optional[int]:
+        """账号交替用:轮换到下一个【已登录】profile,到末尾绕回开头。
+        与 switch_to_next_profile 的区别:
+          ① 会 wrap —— 不把"走到列表末尾"当作池耗尽;
+          ② 若除当前外没有其它可登录的 profile,会把当前 profile 重新拉起并返回 None,
+             让调用方退回"单账号 + 冷却"模式(而不是留下一个关掉的浏览器)。
+        成功返回新 profile_id;只有 1 个账号可用时返回 None。"""
+        if len(self.available_profiles) <= 1:
+            return None  # 池里只有 1 个,无从交替,保持当前 context 不动
+        cur = self.current_profile_id
+        try:
+            start = self.available_profiles.index(cur)
+        except ValueError:
+            start = -1
+        n = len(self.available_profiles)
+        self._close_context()
+        for step in range(1, n):
+            cand = self.available_profiles[(start + step) % n]
+            if cand == cur:
+                continue
+            try:
+                self._launch_profile(cand)
+            except Exception as e:
+                print(f"  轮换启动 profile_{cand} 失败: {e}")
+                continue
+            self.login(auto_login=False)
+            if self.is_logged_in:
+                print(f"  ↻ 账号交替:切到 profile_{cand}")
+                return cand
+            print(f"  ⚠ profile_{cand} 未登录,跳过")
+        # 没有其它可用 profile → 恢复原 profile,调用方走单账号冷却
+        if cur is not None:
+            try:
+                self._launch_profile(cur)
+                self.login(auto_login=False)
+            except Exception as e:
+                print(f"  ⚠ 恢复 profile_{cur} 失败: {e}")
+        return None
+
     def close(self):
         """关闭所有资源."""
         self._close_context()
