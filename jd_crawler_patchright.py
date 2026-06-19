@@ -155,9 +155,12 @@ class JDCrawlerViaSearch:
         self.is_logged_in = False
 
     def _is_logged_in_now(self) -> bool:
-        """访问需要登录的页面,判断是否已登录."""
+        """访问需要登录的页面,判断是否已登录.
+        用「我的京东」(home.jd.com) 而非订单中心 (order.jd.com):两者未登录都会跳 passport,
+        检测逻辑一致;但订单中心是风控严页,自动化浏览器刚扫码登录后访问它会被风控打回登录页,
+        导致轮询误判「未登录」、窗口反复刷回登录页。home.jd.com 在 random_walk 里被当非风控页,更安全."""
         try:
-            self._page.goto("https://order.jd.com/center/list.action",
+            self._page.goto("https://home.jd.com/",
                             wait_until="domcontentloaded", timeout=15000)
             time.sleep(1.5)
             cur = (self._page.url or '').lower()
