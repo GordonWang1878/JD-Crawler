@@ -43,6 +43,16 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 # 京东 PC 新版风控约在单会话 40-50 条触发,降到 30 条以内单批
 JD_BATCH_SIZE = 25
 JD_BATCH_COOLDOWN = 600    # 10 分钟
+
+# 爬取强度预设 — UI 上让用户在「稳」和「快」之间权衡。冷却都是 10 分钟,
+# 只调每批条数:批越大→批数越少→省下的全是 10 分钟的批间等待,但单会话连续请求越多、越易触发风控。
+# ⚠️ 实测:enhanced(100/批)在第 3 批(~第 209 条)即触发京东 PC 频控页
+#    (pc-frequent-pro.pf.jd.com/?reason=403),之后连续失败 100+ 条、完全进不去商品页 —— 不可用,已移除。
+#    未知 speed 一律回退 regular。
+JD_SPEED_PRESETS = {
+    'regular':  {'batch_size': 25,  'cooldown': 600, 'label': '常规'},
+    'fast':     {'batch_size': 50,  'cooldown': 600, 'label': '快速'},
+}
 TMALL_BATCH_SIZE = 25      # 天猫反爬同样严格
 TMALL_BATCH_COOLDOWN = 1500  # 25 分钟
 
@@ -414,31 +424,41 @@ def api_crawl_retry():
     if is_crawling:
         return jsonify({'error': f'Crawler is already running ({current_platform})'}), 400
 
-    # Collect failed JD items only (含 skipped — 批次内主动跳过的)
-    retryable_statuses = ('failed', 'blocked', 'forbidden', 'skipped')
+    # 收集可重试的京东项(含 skipped — 批次内主动跳过的)
+    # 不在这里提前从 live_results 删除它们 — 旧逻辑在开爬「前」就删,一旦爬取线程崩溃,
+    # 失败项既没重爬又已丢失、再也重试不了。改为保留,run_crawl_task_from_rows 用
+    # _upsert_live_result 在拿到新结果时按 URL 替换旧记录(幂等),不重复也不丢。
     failed_items = [r for r in live_results
                     if r.get('platform') == 'jd'
-                    and r.get('status') in retryable_statuses]
+                    and r.get('status') in RETRYABLE_STATUSES]
 
-    if not failed_items:
-        return jsonify({'error': 'No failed JD items to retry'}), 400
-
-    # Remove these failed JD items from live_results
-    live_results = [r for r in live_results
-                    if not (r.get('platform') == 'jd'
-                            and r.get('status') in retryable_statuses)]
-
-    # 复用原文件名 — retry 完成后会覆盖,得到完整最终版
-    if not current_batch_file or not os.path.exists(os.path.dirname(current_batch_file) or '.'):
-        # fallback:如果没有 current_batch_file(异常情况),生成新文件
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        current_batch_file = os.path.join(app.config['OUTPUT_FOLDER'], f"JD_Price_Marks_{timestamp}.xlsx")
+    if failed_items:
+        # in-session:复用当前主文件名,retry 完成后回填得到完整最终版
+        if not current_batch_file or not os.path.exists(os.path.dirname(current_batch_file) or '.'):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            current_batch_file = os.path.join(app.config['OUTPUT_FOLDER'], f"JD_Price_Marks_{timestamp}.xlsx")
+    else:
+        # 内存里没有(Flask 重启后)→ 从磁盘最新的错误小文件恢复:
+        # 读它拿到「要重爬哪些」,主文件路径由文件名配对推出(去掉 _errors 后缀)。
+        err_file = _latest_errors_file()
+        if not err_file:
+            return jsonify({'error': 'No failed JD items to retry'}), 400
+        failed_items = _parse_excel(err_file)
+        if not failed_items:
+            return jsonify({'error': 'No failed JD items to retry'}), 400
+        master = err_file[:-len('_errors.xlsx')] + '.xlsx'
+        current_batch_file = master if os.path.exists(master) else os.path.join(
+            app.config['OUTPUT_FOLDER'],
+            f"JD_Price_Marks_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
+        emit_log('INFO', f'内存无失败项,从错误文件恢复重试: {os.path.basename(err_file)}'
+                         f'({len(failed_items)} 条)→ 回填 {os.path.basename(current_batch_file)}')
 
     output_filename = os.path.basename(current_batch_file)
 
     is_crawling = True
     current_platform = 'jd'
-    crawling_task = Thread(target=run_crawl_task_from_rows, args=(failed_items, current_batch_file, {}))
+    crawling_task = Thread(target=run_crawl_task_from_rows,
+                           args=(failed_items, current_batch_file, {'is_retry': True}))
     crawling_task.start()
 
     return jsonify({
@@ -454,6 +474,72 @@ def api_crawl_stop():
     global is_crawling
     is_crawling = False
     return jsonify({'success': True, 'message': 'Crawling stopped'})
+
+def _kill_stale_browser_processes():
+    """杀掉残留的 patchright Chromium for Testing / chromedriver 进程,返回被杀的 pattern 列表.
+    ⚠️ 进程命令行是 'Google Chrome for Testing'(路径里只有小写 chromium-1217),
+    旧代码用 pkill -f 'Chromium'(大写 C)匹配 0 个 → 僵尸进程从不被清理,
+    占着 profile 的 user-data-dir 锁,导致下次 launch_persistent_context 撞
+    'Opening in existing browser session' → TargetClosedError."""
+    import subprocess
+    killed = []
+    for pattern in ('Chrome for Testing', 'chrome_crashpad', 'chromedriver'):
+        try:
+            r = subprocess.run(['pkill', '-9', '-f', pattern], capture_output=True)
+            if r.returncode == 0:
+                killed.append(pattern)
+        except Exception:
+            pass
+    return killed
+
+
+def _row_identity(brand, item, url, product_key):
+    """一行的业务身份 = (Brand, Item, URL, Product Key) 归一化元组。
+    ⚠️ 不能只用 URL:源数据里允许同一个京东商品挂多条不同 Item 的行(同 URL 不同 Item),
+    它们是合法的不同行,必须各自保留;只有四元组才能唯一区分。"""
+    return (str(brand or '').strip(), str(item or '').strip(),
+            str(url or '').strip(), str(product_key or '').strip())
+
+
+def _live_row_identity(r):
+    """从 live_results 行(小写键)取身份。Product Key 与写 Excel 时一致:product_key 缺失则用 product_id。"""
+    return _row_identity(r.get('brand'), r.get('item'), r.get('url'),
+                         r.get('product_key') or r.get('product_id'))
+
+
+def _upsert_live_result(row):
+    """按「完整行身份」把结果写进 live_results — 已存在同身份旧记录(retry 重爬同一行)就先删旧再加,
+    避免 failed 旧行和 success 新行同时存在(否则下次 retry 会把已成功的旧 failed 行又捞出来重爬)。
+    仅 retry 用;普通爬取用 append 原样保留所有行(含合法的同 URL 不同 Item 行)。"""
+    global live_results
+    plat = row.get('platform')
+    key = _live_row_identity(row)
+    live_results = [r for r in live_results
+                    if not (r.get('platform') == plat and _live_row_identity(r) == key)]
+    live_results.append(row)
+
+
+# 错误小文件与主文件「同名配对」:主文件 JD_Price_Marks_X.xlsx ↔ 错误文件 JD_Price_Marks_X_errors.xlsx。
+# 这样 Flask 重启后(live_results 已清空),retry 只需找到最新的 *_errors.xlsx,
+# 就能既拿到「要重爬哪些」(读错误文件),又知道「回填到哪个主文件」(去掉 _errors 后缀)。
+RETRYABLE_STATUSES = ('failed', 'blocked', 'forbidden', 'skipped')
+
+
+def _errors_path_for(master_path):
+    """主文件路径 → 配对的错误文件路径(……_errors.xlsx)."""
+    if master_path.endswith('.xlsx'):
+        return master_path[:-len('.xlsx')] + '_errors.xlsx'
+    return master_path + '_errors.xlsx'
+
+
+def _latest_errors_file():
+    """outputs/ 下最新的京东错误文件,没有则返回 None(用于 Flask 重启后恢复 retry)."""
+    import glob
+    files = glob.glob(os.path.join(app.config['OUTPUT_FOLDER'], 'JD_*_errors.xlsx'))
+    if not files:
+        return None
+    return max(files, key=os.path.getmtime)
+
 
 @app.route('/api/reset_browser', methods=['POST'])
 def api_reset_browser():
@@ -483,16 +569,8 @@ def api_reset_browser():
     crawler_instance = None
     tmall_crawler_instance = None
 
-    # 强力清理:杀掉所有 patchright/Chromium for Testing 进程,以及 chromedriver
-    import subprocess
-    killed = []
-    for pattern in ('Chromium', 'chrome_crashpad', 'chromedriver'):
-        try:
-            r = subprocess.run(['pkill', '-9', '-f', pattern], capture_output=True)
-            if r.returncode == 0:
-                killed.append(pattern)
-        except Exception:
-            pass
+    # 强力清理:杀掉所有 patchright Chrome for Testing 进程,以及 chromedriver
+    killed = _kill_stale_browser_processes()
 
     return jsonify({
         'success': True,
@@ -793,6 +871,14 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
     """运行爬取任务(京东,从 row dict 列表)"""
     global is_crawling, current_platform, crawler_instance, current_results, live_results
 
+    # retry 时按「行身份」替换 live_results 里的旧 failed 行(幂等);普通爬取原样 append 保留所有行
+    is_retry = bool((config or {}).get('is_retry'))
+
+    # 爬取强度:UI 传 speed=regular/fast/enhanced,决定每批条数与批间冷却(默认常规)
+    preset = JD_SPEED_PRESETS.get((config or {}).get('speed'), JD_SPEED_PRESETS['regular'])
+    batch_size = preset['batch_size']
+    batch_cooldown = preset['cooldown']
+
     try:
         total = len(input_rows)
         emit_log('INFO', '=' * 50)
@@ -809,6 +895,22 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
                 crawler.login()
         else:
             emit_log('INFO', 'Initializing browser...')
+            # 上一轮跑完后 chromium 进程可能仍残留并占着 profile 的 user-data-dir 锁,
+            # 直接 launch_persistent_context 会撞 "Opening in existing browser session"
+            # → TargetClosedError(retry 失效的根因)。先关旧 context + 杀残留进程,确保干净启动。
+            if crawler_instance is not None:
+                try:
+                    close_fn = (getattr(crawler_instance, '_close_context', None)
+                                or getattr(crawler_instance, 'close', None))
+                    if close_fn:
+                        close_fn()
+                except Exception:
+                    pass
+                crawler_instance = None
+            killed = _kill_stale_browser_processes()
+            if killed:
+                emit_log('INFO', f'已清理残留浏览器进程: {", ".join(killed)}')
+                time.sleep(1.5)
             crawler = JDCrawlerViaSearch(headless=False)
             crawler_instance = crawler
             emit_log('INFO', 'Logging in...')
@@ -856,14 +958,14 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
         consecutive_failures = 0
         anti_crawl_cooldowns = 0  # 单批内已触发反爬冷却的次数
 
-        # 自动分批:单批 JD_BATCH_SIZE 条,批次间冷却 JD_BATCH_COOLDOWN 秒
-        chunks = [input_rows[i:i + JD_BATCH_SIZE]
-                  for i in range(0, total, JD_BATCH_SIZE)]
+        # 自动分批:单批 batch_size 条,批次间冷却 batch_cooldown 秒(由爬取强度预设决定)
+        chunks = [input_rows[i:i + batch_size]
+                  for i in range(0, total, batch_size)]
         total_batches = len(chunks)
         if total_batches > 1:
             emit_log('INFO',
-                     f'自动分批: {total} 条 -> {total_batches} 批 '
-                     f'(每批 {JD_BATCH_SIZE} 条, 批间冷却 {JD_BATCH_COOLDOWN//60} 分钟)')
+                     f'自动分批({preset["label"]}强度): {total} 条 -> {total_batches} 批 '
+                     f'(每批 {batch_size} 条, 批间冷却 {batch_cooldown//60} 分钟)')
 
         global_idx = 0
         user_stopped = False
@@ -926,7 +1028,10 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
                 if not row:
                     continue
 
-                live_results.append(row)
+                if is_retry:
+                    _upsert_live_result(row)
+                else:
+                    live_results.append(row)
                 emit_result_row(row)
                 items_since_walk += 1
 
@@ -961,7 +1066,7 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
                         skip_n = len(remaining_rows)
                         emit_log('ERROR',
                                  f'✗ profile 池已耗尽 — 跳过本批剩余 {skip_n} 条,'
-                                 f'进入下一批冷却({JD_BATCH_COOLDOWN//60} 分钟后会重新从 profile_1 开始)')
+                                 f'进入下一批冷却({batch_cooldown//60} 分钟后会重新从 profile_1 开始)')
                         crawl_time_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         for sk_row in remaining_rows:
                             global_idx += 1
@@ -983,7 +1088,10 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
                                 'promo_price': '-',
                                 'status': 'skipped',
                             }
-                            live_results.append(skipped)
+                            if is_retry:
+                                _upsert_live_result(skipped)
+                            else:
+                                live_results.append(skipped)
                             emit_result_row(skipped)
                             failed_count += 1
                         emit_progress({
@@ -1011,19 +1119,22 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
             if batch_idx < total_batches and is_crawling:
                 emit_log('INFO',
                          f'✓ 第 {batch_idx}/{total_batches} 批完成 — '
-                         f'冷却 {JD_BATCH_COOLDOWN//60} 分钟后继续下一批')
-                if not _batch_cooldown(JD_BATCH_COOLDOWN, platform='jd'):
+                         f'冷却 {batch_cooldown//60} 分钟后继续下一批')
+                if not _batch_cooldown(batch_cooldown, platform='jd'):
                     user_stopped = True
                     break
 
         if user_stopped:
             emit_log('WARNING', 'Crawl stopped by user')
 
-        # 保存Excel
+        # 保存 Excel — 按「行身份」回填进磁盘上已有的主文件:
+        # retry 只爬了几条、或 Flask 重启后 live_results 只剩本次几条时,主文件里「没参与本次」
+        # 的其余行原样保留,本次结果就地替换对应行。用列表+身份匹配(不是按 URL 建字典),
+        # 因为同 URL 不同 Item 是合法的多行,字典会把它们折叠丢行。
         emit_log('INFO', 'Saving results to Excel...')
-        excel_rows = []
-        for r in live_results:
-            excel_rows.append({
+
+        def _to_excel_row(r):
+            return {
                 'Batch Time': r['batch_time'],
                 'Crawl Time': r['crawl_time'],
                 'Brand': r.get('brand', ''),
@@ -1033,11 +1144,71 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
                 'Price Reference': r.get('price_reference', ''),
                 'Status': r['status'],
                 'Price': r['original_price'] if r['original_price'] not in (None, '-') else 'N/A',
-                'Promotion Price': r['promo_price'] if r['promo_price'] not in (None, '-') else 'N/A'
-            })
+                'Promotion Price': r['promo_price'] if r['promo_price'] not in (None, '-') else 'N/A',
+            }
 
-        df_results = pd.DataFrame(excel_rows)
+        # 本次会话的京东结果,按行身份建索引(同身份取最后一条)
+        session_by_id = {}
+        for r in live_results:
+            if r.get('platform') == 'jd' and r.get('url'):
+                session_by_id[_live_row_identity(r)] = _to_excel_row(r)
+
+        out_rows = []
+        if os.path.exists(output_filepath):
+            # 主文件已存在(retry/重启):逐行读旧主文件,身份命中本次结果就就地替换,否则原样保留 —— 保序、保数量
+            used = set()
+            try:
+                old_df = pd.read_excel(output_filepath)
+                for _, orow in old_df.iterrows():
+                    oid = _row_identity(orow.get('Brand'), orow.get('Item'),
+                                        orow.get('URL'), orow.get('Product Key'))
+                    if oid in session_by_id:
+                        out_rows.append(session_by_id[oid])
+                        used.add(oid)
+                    else:
+                        out_rows.append({c: ('' if pd.isna(orow[c]) else orow[c])
+                                         for c in old_df.columns})
+            except Exception as e:
+                emit_log('WARNING', f'读取旧主文件失败(忽略,按本次结果全新写入): {e}')
+                out_rows = []
+                used = set()
+            # 本次有、但旧主文件里没有的(全新行)追加到末尾
+            for sid, srow in session_by_id.items():
+                if sid not in used:
+                    out_rows.append(srow)
+        else:
+            # 全新一批:原样写出本次所有行(普通爬取用 append,合法的同 URL 不同 Item 行都在)
+            out_rows = [_to_excel_row(r) for r in live_results
+                        if r.get('platform') == 'jd' and r.get('url')]
+
+        df_results = pd.DataFrame(out_rows)
         df_results.to_excel(output_filepath, index=False, engine='openpyxl')
+
+        # 产出/更新独立错误小文件(上传格式 5 列)——可持久化、可手动当新批次重跑、retry 的数据源。
+        #    从合并后的主文件真相派生「当前还失败的」,全成功则删掉旧错误文件避免误导。
+        errors_path = _errors_path_for(output_filepath)
+        err_rows = [row for row in out_rows
+                    if str(row.get('Status', '')) in RETRYABLE_STATUSES]
+        if err_rows:
+            err_df = pd.DataFrame([{
+                'Brand': row.get('Brand', ''),
+                'Item': row.get('Item', ''),
+                'URL': row.get('URL', ''),
+                'Product Key': row.get('Product Key', ''),
+                'Price Reference': row.get('Price Reference', ''),
+            } for row in err_rows])
+            err_df.to_excel(errors_path, index=False, engine='openpyxl')
+            errors_file_name = os.path.basename(errors_path)
+            emit_log('INFO',
+                     f'  ⚠ {len(err_rows)} 条失败/跳过 → 错误文件 {errors_file_name}'
+                     f'(可点「重试失败项」,或手动当新批次重新上传)')
+        else:
+            errors_file_name = None
+            try:
+                if os.path.exists(errors_path):
+                    os.remove(errors_path)
+            except Exception:
+                pass
 
         duration = time.time() - start_time
         emit_log('INFO', '=' * 50)
@@ -1053,6 +1224,7 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
             'success': True,
             'platform': 'jd',
             'output_file': os.path.basename(output_filepath),
+            'errors_file': errors_file_name,
             'stats': {
                 'success': success_count,
                 'failed': failed_count,
