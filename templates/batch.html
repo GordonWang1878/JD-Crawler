@@ -330,6 +330,30 @@ body {
 .btn-gold:hover { background: var(--gold-light); }
 .btn-amber { background: transparent; color: var(--gold); border: 1px solid var(--gold); }
 .btn-amber:hover { background: var(--gold); color: #fff; }
+/* 下载错误记录 — 比"下载结果"(金色主按钮)更安静,用朱砂描边,弱化为次级动作 */
+.btn-err-dl { background: transparent; color: var(--cinnabar); border: 1px solid rgba(194,58,42,0.35); }
+.btn-err-dl:hover { border-color: var(--cinnabar); background: rgba(194,58,42,0.06); }
+
+/* 爬取强度 — 分段选择器,沿用全站"选中=朱砂"的标识语言 */
+.speed-select { display: flex; gap: 6px; }
+.speed-opt {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 9px 4px 8px; cursor: pointer;
+  background: transparent; border: 1px solid rgba(44,44,44,0.12);
+  color: var(--ink-light); font-family: var(--font-body);
+  transition: all 0.18s ease;
+}
+.speed-opt:hover:not(:disabled) { border-color: rgba(44,44,44,0.3); color: var(--ink); }
+.speed-opt .speed-name { font-size: 0.84rem; letter-spacing: 3px; }
+.speed-opt .speed-spec { font-family: var(--font-num); font-size: 0.68rem; color: var(--ink-faint); letter-spacing: 0.3px; }
+.speed-opt.active { border-color: var(--cinnabar); color: var(--cinnabar); background: rgba(194,58,42,0.05); }
+.speed-opt.active .speed-spec { color: var(--cinnabar); opacity: 0.7; }
+.speed-opt:disabled { opacity: 0.4; cursor: not-allowed; }
+.speed-hint {
+  margin-top: 8px; font-size: 0.72rem; color: var(--ink-faint);
+  line-height: 1.5; letter-spacing: 0.2px;
+}
+.speed-hint strong { color: var(--cinnabar); font-weight: 600; }
 .hidden { display: none !important; }
 
 /* Quick query */
@@ -762,7 +786,8 @@ body {
     <!-- Platform tabs -->
     <div class="platform-tabs fade-in">
       <div class="platform-tab active" data-platform="jd">京东</div>
-      <div class="platform-tab" data-platform="tmall">天猫淘宝</div>
+      <!-- 天猫暂时隐藏:先集中打磨京东方案,成熟后再开放。代码保留,去掉 hidden 即可恢复。 -->
+      <div class="platform-tab hidden" data-platform="tmall">天猫淘宝</div>
     </div>
 
     <!-- Upload -->
@@ -790,6 +815,19 @@ body {
       下载模板
     </a>
 
+    <!-- 爬取强度 -->
+    <div class="sec-gap"></div>
+    <div class="sec-label fade-in fd2">爬取强度</div>
+    <div id="speed-select" class="speed-select fade-in fd2">
+      <button type="button" class="speed-opt active" data-speed="regular">
+        <span class="speed-name">常规</span><span class="speed-spec">每批 25 条</span>
+      </button>
+      <button type="button" class="speed-opt" data-speed="fast">
+        <span class="speed-name">快速</span><span class="speed-spec">每批 50 条</span>
+      </button>
+    </div>
+    <div id="speed-hint" class="speed-hint">批间冷却 10 分钟 · <strong>最稳</strong>,默认推荐</div>
+
     <!-- Actions -->
     <div class="sec-gap"></div>
     <div class="sec-label fade-in fd2">操作</div>
@@ -809,6 +847,10 @@ body {
       <button id="btn-download" class="btn btn-gold hidden">
         <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M6.5 1.5L6.5 8.5M3 6L6.5 9.5L10 6"/><path d="M1.5 10L11.5 10"/></svg>
         下载结果
+      </button>
+      <button id="btn-download-errors" class="btn btn-err-dl hidden" title="只含失败/跳过项,可重新上传当新批次重跑">
+        <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M6.5 1.5L6.5 8.5M3 6L6.5 9.5L10 6"/><path d="M1.5 10L11.5 10"/></svg>
+        下载错误记录
       </button>
     </div>
 
@@ -975,12 +1017,28 @@ body {
   };
   const api = () => API[currentPlatform];
 
-  // 每个平台独立的"已上传文件 + 输出文件名 + 失败计数"
+  // 每个平台独立的"已上传文件 + 输出文件名 + 错误文件名 + 失败计数"
   const platformState = {
-    jd:    { uploadedFilePath: null, outputFileName: null, failedCount: 0 },
-    tmall: { uploadedFilePath: null, outputFileName: null, failedCount: 0 },
+    jd:    { uploadedFilePath: null, outputFileName: null, errorsFileName: null, failedCount: 0 },
+    tmall: { uploadedFilePath: null, outputFileName: null, errorsFileName: null, failedCount: 0 },
   };
   const ps = () => platformState[currentPlatform];
+
+  // ===== 爬取强度 =====
+  let selectedSpeed = 'regular';
+  const SPEED_HINTS = {
+    regular:  '批间冷却 10 分钟 · <strong>最稳</strong>,默认推荐',
+    fast:     '批间冷却 10 分钟 · 约<strong>快一倍</strong>,风控风险略升',
+  };
+  document.querySelectorAll('.speed-opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+      if (opt.disabled || opt.classList.contains('active')) return;
+      selectedSpeed = opt.dataset.speed;
+      document.querySelectorAll('.speed-opt').forEach(o => o.classList.toggle('active', o === opt));
+      document.getElementById('speed-hint').innerHTML = SPEED_HINTS[selectedSpeed];
+    });
+  });
+  const setSpeedEnabled = on => document.querySelectorAll('.speed-opt').forEach(o => { o.disabled = !on; });
 
   let logCount = 0;
   let resultCount = 0;
@@ -1090,13 +1148,19 @@ body {
   socket.on('crawl_complete', data => {
     const platform = data.platform || currentPlatform;
     const platformLabel = (API[platform] || API.jd).label;
+    setSpeedEnabled(true);
     if (data.success) {
       appendLog({ timestamp: now(), level: 'INFO', message: `[${platformLabel}] 爬取完成!` });
       platformState[platform].outputFileName = data.output_file;
+      platformState[platform].errorsFileName = data.errors_file || null;
       hide($('btn-stop'));
       show($('btn-download'));
       $('completion-banner').classList.add('vis');
       if (platformState[platform].failedCount > 0) show($('btn-retry'));
+      // 有错误文件才显示"下载错误记录";若平台正显示中则同步切换
+      if (platform === currentPlatform) {
+        if (data.errors_file) show($('btn-download-errors')); else hide($('btn-download-errors'));
+      }
     } else {
       appendLog({ timestamp: now(), level: 'ERROR', message: `[${platformLabel}] 爬取失败: ${data.error}` });
       hide($('btn-stop'));
@@ -1262,14 +1326,16 @@ body {
     const s = ps();
     if (!s.uploadedFilePath) return;
     const startingPlatform = currentPlatform;
+    const cfg = startingPlatform === 'jd' ? { speed: selectedSpeed } : {};
     fetch(api().crawlStart, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filepath: s.uploadedFilePath, config: {} })
+      body: JSON.stringify({ filepath: s.uploadedFilePath, config: cfg })
     }).then(r => r.json()).then(data => {
       if (data.success) {
+        setSpeedEnabled(false);
         hide($('btn-start')); show($('btn-stop'));
-        hide($('btn-retry')); hide($('btn-download'));
+        hide($('btn-retry')); hide($('btn-download')); hide($('btn-download-errors'));
         $('progress-section').classList.add('vis');
         $('stats-bar').classList.add('vis');
         $('completion-banner').classList.remove('vis');
@@ -1286,7 +1352,7 @@ body {
   });
 
   $('btn-stop').addEventListener('click', () => {
-    fetch('/api/crawl/stop', { method: 'POST' }).then(() => { show($('btn-start')); hide($('btn-stop')); });
+    fetch('/api/crawl/stop', { method: 'POST' }).then(() => { show($('btn-start')); hide($('btn-stop')); setSpeedEnabled(true); });
   });
 
   $('btn-reset-browser').addEventListener('click', () => {
@@ -1317,10 +1383,16 @@ body {
     if (fname) window.location.href = `/api/download/${encodeURIComponent(fname)}`;
   });
 
+  $('btn-download-errors').addEventListener('click', () => {
+    const fname = ps().errorsFileName;
+    if (fname) window.location.href = `/api/download/${encodeURIComponent(fname)}`;
+  });
+
   $('btn-retry').addEventListener('click', () => {
     fetch(api().crawlRetry, { method: 'POST' }).then(r => r.json()).then(data => {
       if (data.success) {
-        hide($('btn-retry')); hide($('btn-download')); hide($('btn-start')); show($('btn-stop'));
+        setSpeedEnabled(false);
+        hide($('btn-retry')); hide($('btn-download')); hide($('btn-download-errors')); hide($('btn-start')); show($('btn-stop'));
         $('completion-banner').classList.remove('vis');
         appendLog({ timestamp: now(), level: 'INFO', message: `[${api().label}] 正在重试 ${data.retry_count} 个失败项...` });
       } else if (data.error) {
