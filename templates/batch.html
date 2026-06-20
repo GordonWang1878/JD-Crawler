@@ -600,18 +600,21 @@
       hide($('prepare-indicator'));   // 结果已就绪,撤掉过渡提示
       hide($('btn-stop'));
       show($('btn-start')); $('btn-start').disabled = !ps().uploadedFilePath;   // 可再次运行
-      if (data.success) {
-        appendLog({ timestamp: now(), level: 'INFO', message: `[${platformLabel}] 爬取完成!` });
+      // 只要有产出文件就给出下载入口(正常完成 / 手动停止 / 会话异常中止 一视同仁)
+      if (data.output_file) {
         platformState[platform].outputFileName = data.output_file;
         platformState[platform].errorsFileName = data.errors_file || null;
         show($('btn-download'));
-        $('completion-banner').classList.add('vis');
         if (platformState[platform].failedCount > 0) show($('btn-retry'));
         if (platform === currentPlatform) {
           if (data.errors_file) show($('btn-download-errors')); else hide($('btn-download-errors'));
         }
+      }
+      if (data.success) {
+        appendLog({ timestamp: now(), level: 'INFO', message: `[${platformLabel}] 爬取完成!` });
+        $('completion-banner').classList.add('vis');
       } else {
-        appendLog({ timestamp: now(), level: 'ERROR', message: `[${platformLabel}] 爬取失败: ${data.error}` });
+        appendLog({ timestamp: now(), level: 'ERROR', message: `[${platformLabel}] 已中止: ${data.error}` });
       }
     };
     // 若「正在准备结果」刚显示不久(会话异常时存盘很快),延后收尾,保证过渡态可见

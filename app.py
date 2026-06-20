@@ -1364,11 +1364,14 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
         emit_log('INFO', '=' * 50)
 
         if session_dead:
-            emit_log('ERROR', f'本次因浏览器会话异常而中止 —— 已采集的 {success_count} 条结果已保存(可在「历史记录」下载)')
+            emit_log('ERROR', f'本次因浏览器会话异常而中止 —— 已采集的 {success_count} 条结果已保存,可直接下载')
             socketio.emit('crawl_complete', {
                 'success': False,
                 'platform': 'jd',
-                'error': '浏览器会话异常停止(被关闭或崩溃),已中止。请点「重置浏览器会话」后重试。',
+                'error': '浏览器会话异常停止(被关闭或崩溃),已中止。已采结果可下载;请「重置浏览器会话」后重试剩余。',
+                # 带上产出文件名,让前端照常给出「下载结果 / 错误记录 / 重试」入口
+                'output_file': os.path.basename(output_filepath),
+                'errors_file': errors_file_name,
             })
             is_crawling = False
             current_platform = None
