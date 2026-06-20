@@ -65,8 +65,8 @@
   .grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:30px}
 
   /* upload */
-  .drop{display:flex;align-items:center;gap:13px;text-align:left;border:1px solid var(--hair-2);border-radius:8px;padding:16px;cursor:pointer;transition:.2s}
-  .drop-cap{flex:1;min-width:0}
+  .drop{display:flex;align-items:center;justify-content:center;gap:13px;text-align:center;border:1px solid var(--hair-2);border-radius:8px;padding:16px;cursor:pointer;transition:.2s}
+  .drop-cap{min-width:0}
   .drop:hover,.drop.dragover{border-color:var(--muted);background:var(--panel)}
   /* 已载入态 —— 借鉴 Step2 选中态:橙色实线 + 底色,清晰区分"有文件 / 无文件" */
   .drop.uploaded{border-style:solid;border-color:var(--live);background:rgba(232,93,61,.07)}
@@ -285,32 +285,29 @@
   <div class="body">
     <div class="col left">
       <div class="sec">
-        <div class="grid2">
-          <div>
-            <div class="sec-h"><span class="fol">01</span><h2>数据源</h2><span id="dot-1" class="step-dot s-empty" title="未完成"></span></div>
-            <div id="upload-area" class="drop">
-              <svg class="ico-empty" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M12 3v12M8 8l4-5 4 5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke-linecap="round"/></svg>
-              <svg class="ico-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12.5l4.5 4.5L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              <div class="drop-cap">
-                <strong class="cap-empty">拖入或点击上传</strong><span class="micro cap-empty">.xlsx / .xls</span>
-                <strong class="cap-done">文件已载入</strong><span class="micro cap-done">点击可重新上传</span>
-              </div>
-              <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none">
-            </div>
-            <div id="file-badge" class="file-badge"><span id="file-badge-text">-</span><span class="micro">已载入</span></div>
-            <a id="template-link" class="template-link" href="/api/template" download title="下载标准格式 Excel 模板">
-              <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 1.5 L6.5 8.5 M3 6 L6.5 9.5 L10 6"/><path d="M2 11 L11 11"/></svg>下载模板
-            </a>
+        <div class="sec-h"><span class="fol">01</span><h2>数据源</h2><span id="dot-1" class="step-dot s-empty" title="未完成"></span></div>
+        <div id="upload-area" class="drop">
+          <svg class="ico-empty" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M12 3v12M8 8l4-5 4 5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke-linecap="round"/></svg>
+          <svg class="ico-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12.5l4.5 4.5L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="drop-cap">
+            <strong class="cap-empty">拖入或点击上传</strong><span class="micro cap-empty">.xlsx / .xls</span>
+            <strong class="cap-done">文件已载入</strong><span class="micro cap-done">点击可重新上传</span>
           </div>
-          <div>
-            <div class="sec-h"><span class="fol">02</span><h2>采集强度</h2><span id="dot-2" class="step-dot s-done" title="已完成"></span></div>
-            <div id="speed-select" class="speed-select">
-              <button type="button" class="speed-opt active" data-speed="regular"><span class="speed-name">常规</span><span class="speed-spec">25 / 批</span></button>
-              <button type="button" class="speed-opt" data-speed="fast"><span class="speed-name">快速</span><span class="speed-spec">50 / 批</span></button>
-            </div>
-            <div id="speed-hint" class="speed-hint">批间冷却 10 分钟 · <strong>最稳</strong>,默认推荐</div>
-          </div>
+          <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none">
         </div>
+        <div id="file-badge" class="file-badge"><span id="file-badge-text">-</span><span class="micro">已载入</span></div>
+        <a id="template-link" class="template-link" href="/api/template" download title="下载标准格式 Excel 模板">
+          <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 1.5 L6.5 8.5 M3 6 L6.5 9.5 L10 6"/><path d="M2 11 L11 11"/></svg>下载模板
+        </a>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><span class="fol">02</span><h2>采集强度</h2><span id="dot-2" class="step-dot s-done" title="已完成"></span></div>
+        <div id="speed-select" class="speed-select">
+          <button type="button" class="speed-opt active" data-speed="regular"><span class="speed-name">常规</span><span class="speed-spec">25 / 批</span></button>
+          <button type="button" class="speed-opt" data-speed="fast"><span class="speed-name">快速</span><span class="speed-spec">50 / 批</span></button>
+        </div>
+        <div id="speed-hint" class="speed-hint">批间冷却 10 分钟 · <strong>最稳</strong>,默认推荐</div>
       </div>
 
       <div class="sec">
