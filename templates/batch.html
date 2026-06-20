@@ -57,7 +57,7 @@
   .sec-h .fol{font-family:'IBM Plex Mono';font-size:var(--t-meta);color:var(--live);font-weight:500}
   .sec-h h2{font-weight:700;font-size:var(--t-h2);letter-spacing:.3px;color:var(--num)}
   .sec-h .meta{margin-left:auto}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:30px}
+  .grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:30px}
 
   /* upload */
   .drop{border:1px dashed var(--hair-2);border-radius:8px;padding:22px;text-align:center;cursor:pointer;transition:.2s}
@@ -66,9 +66,10 @@
   .drop svg{width:26px;height:26px;color:var(--muted);margin:0 auto 9px;display:block}
   .drop strong{display:block;font-size:var(--t-body);font-weight:500;color:var(--paper)}
   .drop .micro{margin-top:5px;letter-spacing:1px}
-  .file-badge{display:none;margin-top:12px;justify-content:space-between;align-items:center;padding-top:11px;border-top:1px solid var(--hair)}
+  .file-badge{display:none;gap:10px;margin-top:12px;justify-content:space-between;align-items:center;padding-top:11px;border-top:1px solid var(--hair)}
   .file-badge.vis{display:flex}
-  #file-badge-text{font-family:'IBM Plex Mono';font-size:var(--t-meta);color:var(--ok)}
+  #file-badge-text{flex:1;min-width:0;font-family:'IBM Plex Mono';font-size:var(--t-meta);color:var(--ok);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .file-badge .micro{flex-shrink:0}
   .template-link{display:inline-flex;align-items:center;gap:6px;margin-top:12px;font-size:var(--t-meta);color:var(--muted)}
   .template-link svg{width:12px;height:12px}.template-link:hover{color:var(--ok)}
 
