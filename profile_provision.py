@@ -193,11 +193,20 @@ def _scan_worker(pid, emit, before_launch, on_done):
                 if _state['cancel']:
                     _emit_status(emit, pid, 'cancelled', '已取消')
                     break
-                time.sleep(3)
-                logged, nick = _check_login(page)
-                if logged:
-                    ok, nickname = True, nick
-                    break
+                time.sleep(2)
+                # ⚠️ 扫码等待期间【绝不导航离开登录页】——否则每次轮询都把二维码刷新掉、来不及扫。
+                # 只读当前 URL:扫码成功后 JD 会自己从 passport 跳走。
+                try:
+                    cur = (page.evaluate("location.href") or '').lower()
+                except Exception:
+                    cur = ''
+                if cur and 'passport.jd.com' not in cur and 'login' not in cur:
+                    # 疑似已登录跳走 —— 此时才允许导航到「我的京东」确认并抓昵称
+                    logged, nick = _check_login(page)
+                    if logged:
+                        ok, nickname = True, nick
+                        break
+                    # 误判(罕见的中转跳转):继续等,页面顶多被带回登录页一次,不会每轮刷新
                 _emit_status(emit, pid, 'waiting', '等待扫码…',
                              remaining=max(0, int(deadline - time.time())))
 
