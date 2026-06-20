@@ -62,7 +62,14 @@
   /* upload */
   .drop{border:1px dashed var(--hair-2);border-radius:8px;padding:22px;text-align:center;cursor:pointer;transition:.2s}
   .drop:hover,.drop.dragover{border-color:var(--muted);background:var(--panel)}
-  .drop.uploaded{border-style:solid;border-color:rgba(164,178,126,.35)}
+  /* 已载入态 —— 借鉴 Step2 选中态:橙色实线 + 底色,清晰区分"有文件 / 无文件" */
+  .drop.uploaded{border-style:solid;border-color:var(--live);background:rgba(232,93,61,.07)}
+  .drop.uploaded:hover{border-color:var(--live);background:rgba(232,93,61,.11)}
+  .drop .ico-done,.drop .cap-done{display:none}
+  .drop.uploaded .ico-empty,.drop.uploaded .cap-empty{display:none}
+  .drop.uploaded .ico-done{display:block;color:var(--live)}
+  .drop.uploaded strong.cap-done{display:block;color:var(--live)}
+  .drop.uploaded .micro.cap-done{display:block}
   .drop svg{width:26px;height:26px;color:var(--muted);margin:0 auto 9px;display:block}
   .drop strong{display:block;font-size:var(--t-body);font-weight:500;color:var(--paper)}
   .drop .micro{margin-top:5px;letter-spacing:1px}
@@ -261,8 +268,10 @@
           <div>
             <div class="sec-h"><span class="fol">01</span><h2>数据源</h2></div>
             <div id="upload-area" class="drop">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M12 3v12M8 8l4-5 4 5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke-linecap="round"/></svg>
-              <strong>拖入 Excel 或点击上传</strong><span class="micro">.xlsx / .xls</span>
+              <svg class="ico-empty" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M12 3v12M8 8l4-5 4 5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke-linecap="round"/></svg>
+              <svg class="ico-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12.5l4.5 4.5L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <strong class="cap-empty">拖入 Excel 或点击上传</strong><span class="micro cap-empty">.xlsx / .xls</span>
+              <strong class="cap-done">文件已载入</strong><span class="micro cap-done">点击可重新上传</span>
               <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none">
             </div>
             <div id="file-badge" class="file-badge"><span id="file-badge-text">-</span><span class="micro">已载入</span></div>
