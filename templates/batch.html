@@ -53,6 +53,9 @@
   .col.right{border-left:1px solid var(--hair);display:flex;flex-direction:column}
 
   .sec{padding:24px 30px;border-bottom:1px solid var(--hair)}
+  /* 采集进行中:整个设置栏锁定(变暗 + 不可操作),需先停止采集 */
+  .col.left.locked .sec{opacity:.45;pointer-events:none;transition:opacity .2s}
+  .col.left.locked .speed-opt:disabled{opacity:1}  /* 避免与 sec 的变暗叠加导致过淡 */
   .sec-h{display:flex;align-items:center;gap:11px;margin-bottom:18px}
   .sec-h .fol{font-family:'IBM Plex Mono';font-size:var(--t-meta);color:var(--live);font-weight:500}
   .sec-h h2{font-weight:700;font-size:var(--t-h2);letter-spacing:.3px;color:var(--num)}
@@ -1043,6 +1046,15 @@
   // 账号池弹窗里增删改后 pool-list 会重渲染,据渲染出的已登录卡片(.pill-ok)实时更新;关闭弹窗再兜底拉一次
   if($('pool-list')) new MutationObserver(()=>step3(document.querySelectorAll('#pool-list .pill-ok').length)).observe($('pool-list'), {childList:true, subtree:true});
   if($('pool-overlay')) new MutationObserver(()=>{ if(!$('pool-overlay').classList.contains('vis')) step3Fetch(); }).observe($('pool-overlay'), {attributes:true, attributeFilter:['class']});
+
+  // 采集进行中锁定整个设置栏:「停止采集」可见 ⟺ 正在采集
+  function syncLock(){
+    const crawling = $('btn-stop') && !$('btn-stop').classList.contains('hidden');
+    const left = document.querySelector('.col.left');
+    if(left) left.classList.toggle('locked', !!crawling);
+  }
+  syncLock();
+  if($('btn-stop')) new MutationObserver(syncLock).observe($('btn-stop'), {attributes:true, attributeFilter:['class']});
 })();
 </script>
 </body>
