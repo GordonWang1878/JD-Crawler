@@ -3,371 +3,344 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>采集控制台 · JD / Tmall</title>
+<title>价格采集台 · JD / Tmall</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0C0F14; --panel:#141922; --panel-2:#1A212C; --line:#262F3D; --line-2:#323D4D;
-    --txt:#C9D3E0; --muted:#76828F; --dim:#4D5765; --ink-faint:#4D5765;
-    --amber:#FFB020; --cyan:#37D7CE; --coral:#FF6B5D; --violet:#8B8CFF; --green:#46C77F;
-    --grid:rgba(55,215,206,0.035);
-    --font-num:'JetBrains Mono',monospace;
+    --bg:#161410; --panel:#1C1915; --raise:#231F18; --hair:#322D24; --hair-2:#41382B;
+    --paper:#E6E0D1; --num:#F6F2E8; --muted:#9A917C; --dim:#655D4B; --ink-faint:#655D4B;
+    --live:#E85D3D; --ok:#A4B27E; --amber:#E8A04D;
+    --t-display:1.8rem; --t-hero:4.2rem; --t-h2:1.06rem; --t-body:.9rem; --t-meta:.78rem; --t-micro:.66rem;
+    --font-num:'IBM Plex Mono',monospace;
   }
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Inter','Space Grotesk',sans-serif;background:var(--bg);color:var(--txt);height:100vh;overflow:hidden;
-    background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:40px 40px}
-  .mono{font-family:'JetBrains Mono',monospace}.gk{font-family:'Space Grotesk',sans-serif}
+  body{font-family:'Noto Sans SC',sans-serif;background:var(--bg);color:var(--paper);height:100vh;overflow:hidden;font-feature-settings:"tnum" 1}
+  .gk{font-family:'Space Grotesk',sans-serif}.mo{font-family:'IBM Plex Mono',monospace;font-feature-settings:"tnum" 1}
+  .micro{font-family:'IBM Plex Mono',monospace;font-size:var(--t-micro);letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
   .hidden{display:none !important}
-  a{color:inherit}
-  ::-webkit-scrollbar{width:7px;height:7px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}::-webkit-scrollbar-track{background:transparent}
-  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,176,32,.5)}70%{box-shadow:0 0 0 7px rgba(255,176,32,0)}100%{box-shadow:0 0 0 0 rgba(255,176,32,0)}}
+  a{color:inherit;text-decoration:none}
+  ::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:var(--hair);border-radius:4px}::-webkit-scrollbar-track{background:transparent}
+  @keyframes blink{50%{opacity:.4}}
   @keyframes fadeUp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
-  /* topbar */
-  .topbar{height:56px;display:flex;align-items:center;gap:18px;padding:0 22px;border-bottom:1px solid var(--line);background:rgba(12,15,20,.75);backdrop-filter:blur(8px);position:relative;z-index:5}
-  .logo{display:flex;align-items:center;gap:11px}
-  .logo-mark{width:26px;height:26px;border:1.5px solid var(--amber);border-radius:5px;display:grid;place-items:center}
-  .logo-mark::after{content:'';width:8px;height:8px;background:var(--amber);border-radius:1px;box-shadow:0 0 10px var(--amber)}
-  .logo-name{font-family:'Space Grotesk';font-weight:600;font-size:.95rem;letter-spacing:.5px}
-  .logo-name span{color:var(--muted);font-weight:400}
-  .conn{display:flex;align-items:center;gap:9px;padding:5px 13px;border:1px solid var(--line);background:var(--panel);border-radius:20px}
+  /* MASTHEAD */
+  .masthead{display:flex;align-items:center;gap:20px;padding:18px 30px;border-bottom:1px solid var(--hair)}
+  .mark{width:42px;height:42px;border-radius:10px;background:var(--live);display:grid;place-items:center;flex-shrink:0}
+  .mark::after{content:'';width:15px;height:15px;border:2.5px solid #1A0E08;border-radius:3px}
+  .title-wrap .title{font-weight:700;font-size:var(--t-display);letter-spacing:-.5px;line-height:1.05;color:var(--num)}
+  .title-wrap .sub{font-size:var(--t-meta);color:var(--muted);margin-top:4px}
+  .mast-sp{flex:1}
+  .plat{display:flex;gap:3px;background:var(--panel);border:1px solid var(--hair);border-radius:8px;padding:3px}
+  .platform-tab{font-family:'Noto Sans SC';font-size:var(--t-meta);font-weight:500;padding:6px 13px;border-radius:6px;cursor:pointer;color:var(--muted)}
+  .platform-tab.active{color:#1A0E08;background:var(--paper)}
+  .conn{display:flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--hair);border-radius:24px}
   .status-dot{width:8px;height:8px;border-radius:50%;background:var(--dim)}
-  .status-dot.on{background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
-  #status-text{font-family:'JetBrains Mono';font-size:.72rem;color:var(--muted);letter-spacing:1px}
-  .topbar-sp{flex:1}
-  .plat{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:3px}
-  .platform-tab{font-family:'Space Grotesk';font-size:.78rem;font-weight:500;padding:6px 14px;border-radius:6px;cursor:pointer;color:var(--muted);letter-spacing:.5px}
-  .platform-tab.active{color:var(--bg);background:var(--cyan)}
+  .status-dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  #status-text{font-family:'IBM Plex Mono';font-size:var(--t-meta);color:var(--muted);letter-spacing:.5px}
+  .act{display:flex;align-items:center;gap:9px;padding:12px 22px;border:none;border-radius:9px;font-family:'Noto Sans SC';font-weight:600;font-size:var(--t-body);cursor:pointer}
+  .act svg{width:13px;height:13px}
+  .btn-start{background:var(--live);color:#1A0E08}
+  .btn-start svg{fill:#1A0E08}
+  .btn-start:hover:not(:disabled){background:#F26B4B}
+  .btn-start:disabled{background:var(--raise);color:var(--dim);cursor:not-allowed}
+  .btn-stop{background:var(--live);color:#1A0E08}.btn-stop svg{fill:#1A0E08}
+  .btn-stop:hover{background:#F26B4B}
 
-  /* layout */
-  .body{display:grid;grid-template-columns:1.18fr .82fr;height:calc(100vh - 56px)}
-  .col{overflow-y:auto;padding:18px}
-  .col.right{border-left:1px solid var(--line);background:rgba(20,25,34,.35);padding:0;display:flex;flex-direction:column}
+  .body{display:grid;grid-template-columns:1.2fr .8fr;height:calc(100vh - 81px)}
+  .col{overflow-y:auto}
+  .col.right{border-left:1px solid var(--hair);display:flex;flex-direction:column}
 
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:16px;overflow:hidden}
-  .panel-h{display:flex;align-items:center;gap:9px;padding:11px 16px;border-bottom:1px solid var(--line)}
-  .panel-h .idx{font-family:'JetBrains Mono';font-size:.66rem;color:var(--dim)}
-  .panel-h .ttl{font-family:'Space Grotesk';font-weight:600;font-size:.8rem;letter-spacing:1.5px;text-transform:uppercase}
-  .panel-h .sub{margin-left:auto;font-family:'JetBrains Mono';font-size:.66rem;color:var(--muted)}
-  .panel-b{padding:16px}
-  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  .two-col .panel{margin-bottom:0}
+  .sec{padding:24px 30px;border-bottom:1px solid var(--hair)}
+  .sec-h{display:flex;align-items:center;gap:11px;margin-bottom:18px}
+  .sec-h .fol{font-family:'IBM Plex Mono';font-size:var(--t-meta);color:var(--live);font-weight:500}
+  .sec-h h2{font-weight:700;font-size:var(--t-h2);letter-spacing:.3px;color:var(--num)}
+  .sec-h .meta{margin-left:auto}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:30px}
 
   /* upload */
-  .drop{border:1.5px dashed var(--line-2);border-radius:8px;padding:20px;text-align:center;background:var(--panel-2);transition:.2s;cursor:pointer}
-  .drop:hover,.drop.dragover{border-color:var(--cyan)}
-  .drop.uploaded{border-style:solid;border-color:rgba(55,215,206,.3)}
-  .drop svg{width:28px;height:28px;margin:0 auto 8px;color:var(--cyan);display:block}
-  .drop strong{display:block;font-size:.84rem;color:var(--txt);font-weight:500}
-  .drop small{font-family:'JetBrains Mono';font-size:.66rem;color:var(--muted)}
-  .file-badge{display:none;margin-top:10px;align-items:center;gap:8px;padding:8px 12px;background:rgba(55,215,206,.06);border:1px solid rgba(55,215,206,.25);border-radius:6px;font-family:'JetBrains Mono';font-size:.72rem;color:var(--cyan)}
+  .drop{border:1px dashed var(--hair-2);border-radius:8px;padding:22px;text-align:center;cursor:pointer;transition:.2s}
+  .drop:hover,.drop.dragover{border-color:var(--muted);background:var(--panel)}
+  .drop.uploaded{border-style:solid;border-color:rgba(164,178,126,.35)}
+  .drop svg{width:26px;height:26px;color:var(--muted);margin:0 auto 9px;display:block}
+  .drop strong{display:block;font-size:var(--t-body);font-weight:500;color:var(--paper)}
+  .drop .micro{margin-top:5px;letter-spacing:1px}
+  .file-badge{display:none;margin-top:12px;justify-content:space-between;align-items:center;padding-top:11px;border-top:1px solid var(--hair)}
   .file-badge.vis{display:flex}
-  .template-link{display:inline-flex;align-items:center;gap:6px;margin-top:11px;font-size:.72rem;color:var(--muted);text-decoration:none}
-  .template-link svg{width:12px;height:12px}
-  .template-link:hover{color:var(--cyan)}
+  #file-badge-text{font-family:'IBM Plex Mono';font-size:var(--t-meta);color:var(--ok)}
+  .template-link{display:inline-flex;align-items:center;gap:6px;margin-top:12px;font-size:var(--t-meta);color:var(--muted)}
+  .template-link svg{width:12px;height:12px}.template-link:hover{color:var(--ok)}
 
   /* speed */
-  .speed-select{display:flex;gap:8px}
-  .speed-opt{flex:1;border:1px solid var(--line-2);border-radius:7px;padding:11px 8px;text-align:center;cursor:pointer;background:var(--panel-2);transition:.18s}
-  .speed-opt:hover:not(:disabled){border-color:var(--dim)}
-  .speed-opt.active{border-color:var(--amber);background:rgba(255,176,32,.08)}
-  .speed-opt .speed-name{font-family:'Space Grotesk';font-weight:600;font-size:.86rem;display:block}
-  .speed-opt.active .speed-name{color:var(--amber)}
-  .speed-opt .speed-spec{font-family:'JetBrains Mono';font-size:.64rem;color:var(--muted);margin-top:3px;display:block}
-  .speed-opt:disabled{opacity:.4;cursor:not-allowed}
-  .speed-hint{margin-top:11px;font-size:.74rem;color:var(--muted);line-height:1.5}
-  .speed-hint strong{color:var(--amber);font-weight:600}
+  .speed-select{display:flex;gap:9px}
+  .speed-opt{flex:1;border:1px solid var(--hair-2);border-radius:8px;padding:13px;text-align:center;cursor:pointer;background:var(--panel);transition:.16s;font-family:inherit}
+  .speed-opt:hover:not(:disabled){border-color:var(--muted)}
+  .speed-opt.active{border-color:var(--live);background:rgba(232,93,61,.07)}
+  .speed-opt .speed-name{font-size:var(--t-body);font-weight:600;color:var(--paper);display:block}
+  .speed-opt.active .speed-name{color:var(--live)}
+  .speed-opt .speed-spec{font-family:'IBM Plex Mono';font-size:var(--t-micro);color:var(--muted);margin-top:4px;display:block}
+  .speed-opt:disabled{opacity:.45;cursor:not-allowed}
+  .speed-hint{margin-top:13px;font-size:var(--t-meta);color:var(--muted);line-height:1.6}
+  .speed-hint strong{color:var(--paper);font-weight:500}
 
-  /* fleet / account entry */
-  .fleet-teaser{font-size:.78rem;color:var(--muted);line-height:1.6;margin-bottom:13px}
-  .fleet-teaser strong{color:var(--cyan)}
-  .btn-pool{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px;background:transparent;color:var(--cyan);border:1px solid rgba(55,215,206,.35);border-radius:7px;cursor:pointer;font-family:'Space Grotesk';font-size:.82rem;font-weight:500;letter-spacing:1px}
+  /* fleet/account */
+  .fleet-teaser{font-size:var(--t-meta);color:var(--muted);line-height:1.7;margin-bottom:14px}
+  .fleet-teaser strong{color:var(--ok)}
+  .btn-pool{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;background:transparent;border:1px solid var(--hair-2);border-radius:8px;color:var(--paper);cursor:pointer;font-family:'Noto Sans SC';font-size:var(--t-body);font-weight:500}
   .btn-pool svg{width:15px;height:15px}
-  .btn-pool:hover{background:rgba(55,215,206,.07);border-color:var(--cyan)}
+  .btn-pool:hover{border-color:var(--ok);color:var(--ok)}
 
-  /* action buttons */
-  .btn-group{display:flex;flex-direction:column;gap:9px}
-  .btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 14px;border:none;border-radius:7px;cursor:pointer;font-family:'Space Grotesk';font-size:.84rem;font-weight:600;letter-spacing:1px;transition:.18s}
-  .btn svg{width:13px;height:13px}
-  .btn:disabled{opacity:.45;cursor:not-allowed}
-  .btn-start{background:var(--amber);color:#1A1206}
-  .btn-start:hover:not(:disabled){background:#FFC246}
-  .btn-stop{background:transparent;border:1px solid var(--coral);color:var(--coral)}
-  .btn-stop:hover{background:rgba(255,107,93,.1)}
-  .btn-retry{background:transparent;border:1px solid var(--amber);color:var(--amber)}
-  .btn-retry:hover{background:rgba(255,176,32,.1)}
-  .btn-download{background:var(--cyan);color:#06201E}
-  .btn-download:hover{background:#5BE5DD}
-  .btn-err-dl{background:transparent;border:1px solid rgba(255,107,93,.5);color:var(--coral)}
-  .btn-err-dl:hover{background:rgba(255,107,93,.08)}
-
-  /* progress + stats */
-  .prog-row{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
-  .prog-cur{font-family:'JetBrains Mono';font-size:1.9rem;font-weight:700;color:var(--txt)}
-  .prog-div{color:var(--dim)}
-  .prog-tot{font-family:'JetBrains Mono';font-size:.9rem;color:var(--muted)}
-  .prog-pct{margin-left:auto;font-family:'JetBrains Mono';font-size:.86rem;color:var(--cyan)}
-  .track{height:6px;background:var(--panel-2);border-radius:3px;overflow:hidden}
-  .fill{height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--amber));border-radius:3px;transition:width .4s}
-  .prog-current{margin-top:10px;font-family:'JetBrains Mono';font-size:.7rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:16px}
-  .stat{text-align:center;padding:11px 4px;border:1px solid var(--line);border-radius:7px;background:var(--panel-2)}
-  .stat .sv{font-family:'JetBrains Mono';font-size:1.2rem;font-weight:700;display:block}
-  .stat .sl{font-size:.66rem;color:var(--muted);margin-top:2px;display:block}
-  .stat.s-ok .sv{color:var(--cyan)}.stat.s-fail .sv{color:var(--coral)}.stat.s-warn .sv{color:var(--amber)}.stat.s-total .sv{color:var(--txt)}
-  .done-banner{display:none;align-items:center;gap:9px;margin-top:14px;padding:10px 14px;border:1px solid rgba(70,199,127,.35);background:rgba(70,199,127,.07);border-radius:7px;color:var(--green);font-size:.8rem;font-weight:500}
-  .done-banner.vis{display:flex}
-  .done-banner svg{width:14px;height:14px;fill:none;stroke:var(--green);stroke-width:1.5}
+  /* progress hero */
+  .prog{display:flex;align-items:flex-end;gap:16px;padding-bottom:16px;border-bottom:1px solid var(--hair)}
+  .prog-cur{font-family:'IBM Plex Mono';font-size:var(--t-hero);font-weight:500;line-height:.84;letter-spacing:-3px;color:var(--num)}
+  .prog-div{font-family:'IBM Plex Mono';font-size:1.05rem;color:var(--dim);margin-bottom:8px}
+  .prog-tot{font-family:'IBM Plex Mono';font-size:1.05rem;color:var(--dim);margin-bottom:8px}
+  .prog-pct{margin-left:auto;font-family:'IBM Plex Mono';font-size:1.25rem;font-weight:500;color:var(--live);margin-bottom:8px}
+  .track{height:2px;background:var(--hair-2);margin-top:18px;position:relative}
+  .fill{position:absolute;left:0;top:-1px;height:4px;width:0;background:var(--live);transition:width .4s}
+  .prog-now{margin-top:14px;font-family:'IBM Plex Mono';font-size:var(--t-meta);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);margin-top:24px}
+  .stat{padding-right:14px;border-right:1px solid var(--hair)}
+  .stat:last-child{border:none}
+  .stat .sv{font-family:'IBM Plex Mono';font-size:1.7rem;font-weight:500;color:var(--num);letter-spacing:-1px;display:block}
+  .stat.s-ok .sv{color:var(--ok)}.stat.s-fail .sv{color:var(--live)}.stat.s-warn .sv{color:var(--amber)}
+  .stat .sl{display:block;font-family:'IBM Plex Mono';font-size:var(--t-micro);letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:5px}
+  .post-acts{display:flex;gap:9px;margin-top:22px}
+  .done-banner{display:none;align-items:center;gap:9px;margin-top:18px;padding:10px 14px;border:1px solid rgba(164,178,126,.35);background:rgba(164,178,126,.08);border-radius:8px;color:var(--ok);font-size:var(--t-body);font-weight:500}
+  .done-banner.vis{display:flex}.done-banner svg{width:14px;height:14px;fill:none;stroke:var(--ok);stroke-width:1.5}
+  .btn-mini{display:flex;align-items:center;gap:7px;padding:10px 14px;border-radius:8px;font-family:'Noto Sans SC';font-size:var(--t-meta);font-weight:500;cursor:pointer;border:1px solid var(--hair-2);background:transparent}
+  .btn-mini svg{width:12px;height:12px}
+  .btn-retry{color:var(--amber);border-color:rgba(232,160,77,.4)}.btn-retry:hover{background:rgba(232,160,77,.1)}
+  .btn-download{color:#1A0E08;background:var(--ok);border-color:var(--ok)}.btn-download:hover{background:#B5C390}
+  .btn-err-dl{color:var(--live);border-color:rgba(232,93,61,.4)}.btn-err-dl:hover{background:rgba(232,93,61,.08)}
 
   /* quick check */
-  .qc-row{display:flex;gap:8px}
-  .qc-input{flex:1;background:var(--panel-2);border:1px solid var(--line-2);border-radius:7px;padding:9px 12px;color:var(--txt);font-family:'JetBrains Mono';font-size:.76rem;outline:none}
-  .qc-input:focus{border-color:var(--cyan)}
-  .qc-input::placeholder{color:var(--dim)}
-  #qc-btn{padding:9px 16px;background:transparent;border:1px solid var(--cyan);color:var(--cyan);border-radius:7px;cursor:pointer;font-family:'Space Grotesk';font-size:.78rem;font-weight:500}
-  #qc-btn:hover{background:rgba(55,215,206,.08)}
-  #qc-btn:disabled{opacity:.5;cursor:not-allowed}
-  .qc-result{display:none;margin-top:12px;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .qc-row{display:flex;gap:9px}
+  .qc-input{flex:1;background:var(--panel);border:1px solid var(--hair-2);border-radius:8px;padding:10px 13px;color:var(--paper);font-family:'IBM Plex Mono';font-size:var(--t-meta);outline:none}
+  .qc-input:focus{border-color:var(--ok)}.qc-input::placeholder{color:var(--dim)}
+  #qc-btn{padding:10px 17px;background:transparent;border:1px solid var(--hair-2);color:var(--paper);border-radius:8px;cursor:pointer;font-family:'Noto Sans SC';font-size:var(--t-meta);font-weight:500}
+  #qc-btn:hover{border-color:var(--ok);color:var(--ok)}#qc-btn:disabled{opacity:.5;cursor:not-allowed}
+  .qc-result{display:none;margin-top:13px;border:1px solid var(--hair);border-radius:8px;overflow:hidden}
   .qc-result.vis{display:block}
-  .qr{display:flex;justify-content:space-between;padding:8px 13px;border-bottom:1px solid var(--line);font-size:.76rem}
-  .qr:last-child{border-bottom:none}
-  .ql{color:var(--muted)}.qv{font-family:'JetBrains Mono';color:var(--txt)}
-  .qv.ok{color:var(--cyan)}.qv.err{color:var(--coral)}
+  .qr{display:flex;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--hair);font-size:var(--t-meta)}
+  .qr:last-child{border:none}.ql{color:var(--muted)}.qv{font-family:'IBM Plex Mono';color:var(--paper)}
+  .qv.ok{color:var(--ok)}.qv.err{color:var(--live)}
 
   /* reset */
-  .reset-section .btn-reset{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:transparent;border:1px solid var(--line-2);color:var(--muted);border-radius:7px;cursor:pointer;font-family:'Space Grotesk';font-size:.8rem;letter-spacing:.5px}
-  .reset-section .btn-reset svg{width:14px;height:14px}
-  .reset-section .btn-reset:hover:not(:disabled){border-color:var(--coral);color:var(--coral)}
-  .reset-section .btn-reset:disabled{opacity:.5;cursor:not-allowed}
-  .reset-hint{margin-top:9px;font-size:.7rem;color:var(--muted);line-height:1.5}
+  .btn-reset{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px;background:transparent;border:1px solid var(--hair-2);color:var(--muted);border-radius:8px;cursor:pointer;font-family:'Noto Sans SC';font-size:var(--t-meta)}
+  .btn-reset svg{width:14px;height:14px}
+  .btn-reset:hover:not(:disabled){border-color:var(--live);color:var(--live)}
+  .btn-reset:disabled{opacity:.5;cursor:not-allowed}
+  .reset-hint{margin-top:10px;font-size:var(--t-micro);color:var(--muted);line-height:1.6;letter-spacing:.2px}
   .reset-hint strong{color:var(--amber)}
 
-  /* right: tabs */
-  .tab-bar{display:flex;align-items:center;gap:2px;padding:0 14px;height:48px;border-bottom:1px solid var(--line);background:rgba(12,15,20,.4);flex-shrink:0}
-  .tab-item{position:relative;font-family:'Space Grotesk';font-size:.76rem;font-weight:500;letter-spacing:1px;padding:14px 13px;cursor:pointer;color:var(--muted);display:flex;align-items:center;gap:6px}
-  .tab-item:hover{color:var(--txt)}
-  .tab-item.active{color:var(--cyan)}
-  .tab-item.active::after{content:'';position:absolute;left:13px;right:13px;bottom:0;height:2px;background:var(--cyan)}
-  .tab-item .tc{font-family:'JetBrains Mono';font-size:.64rem;color:var(--dim);background:var(--panel-2);border-radius:9px;padding:1px 6px}
-  .tab-item.active .tc{color:var(--cyan)}
+  /* right tabs */
+  .tab-bar{display:flex;align-items:center;border-bottom:1px solid var(--hair);flex-shrink:0;padding-right:14px}
+  .tab-item{position:relative;font-size:var(--t-body);font-weight:500;padding:17px 18px;cursor:pointer;color:var(--dim);display:flex;align-items:center;gap:7px}
+  .tab-item:hover{color:var(--paper)}
+  .tab-item.active{color:var(--num)}
+  .tab-item.active::after{content:'';position:absolute;left:18px;right:18px;bottom:0;height:2px;background:var(--live)}
+  .tab-item .tc{font-family:'IBM Plex Mono';font-size:var(--t-micro);color:var(--dim)}
+  .tab-item.active .tc{color:var(--live)}
   .tab-spacer{flex:1}
-  .tab-action{background:transparent;border:1px solid var(--line-2);color:var(--muted);border-radius:6px;padding:5px 11px;font-size:.72rem;cursor:pointer;font-family:'Inter'}
-  .tab-action:hover{border-color:var(--muted);color:var(--txt)}
+  .tab-action{background:transparent;border:1px solid var(--hair-2);color:var(--muted);border-radius:7px;padding:6px 12px;font-size:var(--t-meta);cursor:pointer;font-family:'Noto Sans SC'}
+  .tab-action:hover{border-color:var(--muted);color:var(--paper)}
   .tab-content{flex:1;overflow:hidden;position:relative}
   .tab-pane{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden}
   .tab-pane.active{display:flex}
 
-  .empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--dim);padding:40px}
-  .empty-state svg{width:38px;height:38px;fill:none;stroke:var(--dim);stroke-width:1.4}
-  .empty-text{font-size:.82rem;color:var(--muted)}
+  .empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;color:var(--dim);padding:40px}
+  .empty-state svg{width:38px;height:38px;fill:none;stroke:var(--dim);stroke-width:1.3}
+  .empty-text{font-size:var(--t-body);color:var(--muted)}
 
   .table-wrap{flex:1;overflow:auto}
-  .data-table{width:100%;border-collapse:collapse;font-size:.76rem}
+  .data-table{width:100%;border-collapse:collapse;font-size:var(--t-meta)}
   .data-table thead{position:sticky;top:0;z-index:2}
-  .data-table th{text-align:left;font-family:'Space Grotesk';font-size:.66rem;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);padding:10px 12px;background:var(--panel);border-bottom:1px solid var(--line);font-weight:500;white-space:nowrap}
-  .data-table td{padding:9px 12px;border-bottom:1px solid var(--line);color:var(--txt)}
+  .data-table th{text-align:left;font-family:'IBM Plex Mono';font-size:var(--t-micro);letter-spacing:.5px;text-transform:uppercase;color:var(--dim);padding:11px 14px;background:var(--bg);border-bottom:1px solid var(--hair);font-weight:500;white-space:nowrap}
+  .data-table td{padding:10px 14px;border-bottom:1px solid var(--hair);color:var(--paper)}
   .data-table tr:hover td{background:var(--panel)}
-  .col-idx{color:var(--dim);font-family:var(--font-num);font-size:.72rem;text-align:center}
-  .col-sku{font-family:var(--font-num);font-size:.74rem;color:var(--muted)}
+  .col-idx{color:var(--dim);font-family:var(--font-num);font-size:var(--t-micro);text-align:center}
+  .col-sku{font-family:var(--font-num);font-size:var(--t-meta);color:var(--muted)}
   .col-brand{color:var(--muted);white-space:nowrap}
   .col-item{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .col-url{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .col-url a{color:var(--dim);text-decoration:none}.col-url a:hover{color:var(--cyan)}
-  .col-pref,.col-time{font-family:var(--font-num);font-size:.72rem;color:var(--muted)}
-  .col-price{font-family:var(--font-num);color:var(--cyan)}
-  .col-promo{font-family:var(--font-num);color:var(--amber)}
-  .badge{display:inline-flex;align-items:center;gap:4px;font-size:.68rem;padding:3px 8px;border-radius:5px;white-space:nowrap}
-  .badge-ok{color:var(--cyan);background:rgba(55,215,206,.1)}
-  .badge-warn{color:var(--amber);background:rgba(255,176,32,.1)}
-  .badge-fail{color:var(--coral);background:rgba(255,107,93,.1)}
-  .badge-block{color:var(--violet);background:rgba(139,140,255,.12)}
+  .col-url{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .col-url a{color:var(--dim)}.col-url a:hover{color:var(--ok)}
+  .col-pref,.col-time{font-family:var(--font-num);font-size:var(--t-micro);color:var(--muted)}
+  .col-price{font-family:var(--font-num);color:var(--num)}
+  .col-promo{font-family:var(--font-num);color:var(--live)}
+  .badge{display:inline-flex;align-items:center;gap:4px;font-size:var(--t-micro);padding:3px 8px;border-radius:5px;white-space:nowrap;font-family:'Noto Sans SC'}
+  .badge-ok{color:var(--ok);background:rgba(164,178,126,.12)}
+  .badge-warn{color:var(--amber);background:rgba(232,160,77,.12)}
+  .badge-fail{color:var(--live);background:rgba(232,93,61,.12)}
+  .badge-block{color:var(--amber);background:rgba(232,160,77,.1)}
   .seal-mini{width:11px;height:11px;flex-shrink:0}
-  .platform-badge{font-size:.64rem;padding:2px 7px;border-radius:4px}
-  .platform-badge-jd{color:var(--coral);background:rgba(255,107,93,.1)}
-  .platform-badge-tmall{color:var(--amber);background:rgba(255,176,32,.1)}
+  .platform-badge{font-size:var(--t-micro);padding:2px 7px;border-radius:4px}
+  .platform-badge-jd{color:var(--live);background:rgba(232,93,61,.1)}
+  .platform-badge-tmall{color:var(--amber);background:rgba(232,160,77,.1)}
 
   .log-scroll{flex:1;overflow:auto;padding:8px}
-  .log-line{display:grid;grid-template-columns:66px 60px 1fr;gap:10px;align-items:center;padding:6px 10px;font-family:'JetBrains Mono';font-size:.72rem;border-radius:4px}
-  .log-line:hover{background:var(--panel)}
-  .log-new{animation:fadeUp .2s ease-out}
-  .lt{color:var(--dim)}
-  .ll{font-size:.6rem;letter-spacing:.5px;text-align:center;padding:2px 0;border-radius:3px}
-  .ll.INFO{color:var(--muted);background:rgba(118,130,143,.12)}
-  .ll.WARNING{color:var(--amber);background:rgba(255,176,32,.12)}
-  .ll.ERROR{color:var(--coral);background:rgba(255,107,93,.12)}
-  .lm{color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .lv-WARNING .lm{color:var(--amber)}.lv-ERROR .lm{color:var(--coral)}
+  .log-line{display:grid;grid-template-columns:66px 58px 1fr;gap:11px;align-items:center;padding:7px 12px;font-family:'IBM Plex Mono';font-size:var(--t-meta);border-radius:5px}
+  .log-line:hover{background:var(--panel)}.log-new{animation:fadeUp .2s ease-out}
+  .lt{color:var(--dim);font-size:var(--t-micro)}
+  .ll{font-size:var(--t-micro);letter-spacing:.5px;text-align:center;padding:2px 0;border-radius:3px}
+  .ll.INFO{color:var(--muted);background:rgba(154,145,124,.12)}
+  .ll.WARNING{color:var(--amber);background:rgba(232,160,77,.12)}
+  .ll.ERROR{color:var(--live);background:rgba(232,93,61,.12)}
+  .lm{color:var(--paper);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lv-WARNING .lm{color:var(--amber)}.lv-ERROR .lm{color:var(--live)}
 
-  .history-scroll{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:9px}
-  .history-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:8px}
-  .history-name{font-size:.8rem;color:var(--txt);display:flex;align-items:center;gap:7px}
-  .history-meta{font-family:'JetBrains Mono';font-size:.68rem;color:var(--muted);margin-top:4px}
-  .history-dl{font-size:.74rem;color:var(--cyan);text-decoration:none;border:1px solid rgba(55,215,206,.3);border-radius:5px;padding:5px 12px;flex-shrink:0}
-  .history-dl:hover{background:rgba(55,215,206,.08)}
+  .history-scroll{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+  .history-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border:1px solid var(--hair);border-radius:9px}
+  .history-row:hover{background:var(--panel)}
+  .history-name{font-size:var(--t-body);color:var(--paper);display:flex;align-items:center;gap:7px}
+  .history-meta{font-family:'IBM Plex Mono';font-size:var(--t-micro);color:var(--muted);margin-top:5px}
+  .history-dl{font-size:var(--t-meta);color:var(--ok);border:1px solid rgba(164,178,126,.3);border-radius:6px;padding:6px 13px;flex-shrink:0}
+  .history-dl:hover{background:rgba(164,178,126,.1)}
 
   /* pool modal */
-  .pool-overlay{position:fixed;inset:0;background:rgba(6,8,11,.7);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:1000}
+  .pool-overlay{position:fixed;inset:0;background:rgba(6,5,3,.72);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:1000}
   .pool-overlay.vis{display:flex}
-  .pool-modal{width:min(580px,92vw);max-height:86vh;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line-2);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
-  .pool-head{display:flex;justify-content:space-between;align-items:flex-start;padding:18px 20px 14px;border-bottom:1px solid var(--line)}
-  .pool-title{font-family:'Space Grotesk';font-size:1.1rem;font-weight:600;color:var(--txt);letter-spacing:.5px}
-  .pool-sub{font-size:.72rem;color:var(--muted);margin-top:4px;line-height:1.5}
-  .pool-x{background:none;border:none;font-size:1.5rem;color:var(--muted);cursor:pointer;line-height:1;padding:0 4px}
-  .pool-x:hover{color:var(--coral)}
-  .pool-banner{display:none;align-items:center;justify-content:space-between;gap:12px;margin:14px 20px 0;padding:10px 14px;background:rgba(255,176,32,.08);border:1px solid rgba(255,176,32,.3);border-radius:7px}
+  .pool-modal{width:min(580px,92vw);max-height:86vh;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--hair-2);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+  .pool-head{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 22px 16px;border-bottom:1px solid var(--hair)}
+  .pool-title{font-weight:700;font-size:1.2rem;color:var(--num);letter-spacing:.3px}
+  .pool-sub{font-size:var(--t-meta);color:var(--muted);margin-top:5px;line-height:1.5}
+  .pool-x{background:none;border:none;font-size:1.6rem;color:var(--muted);cursor:pointer;line-height:1;padding:0 4px}.pool-x:hover{color:var(--live)}
+  .pool-banner{display:none;align-items:center;justify-content:space-between;gap:12px;margin:14px 22px 0;padding:11px 15px;background:rgba(232,93,61,.08);border:1px solid rgba(232,93,61,.3);border-radius:8px}
   .pool-banner.vis{display:flex}
-  .pool-banner-msg{font-size:.8rem;color:var(--amber);line-height:1.4}
-  .pool-banner-cancel{flex-shrink:0;background:none;border:1px solid rgba(255,176,32,.4);color:var(--amber);border-radius:5px;font-size:.72rem;padding:4px 10px;cursor:pointer}
-  .pool-banner-cancel:hover{background:var(--amber);color:var(--bg)}
-  .pool-list{overflow:auto;padding:14px 20px;display:flex;flex-direction:column;gap:10px;min-height:90px}
-  .pool-empty{text-align:center;color:var(--muted);font-size:.82rem;padding:24px 0;line-height:1.6}
-  .pool-empty strong{color:var(--cyan)}
-  .pcard{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--panel-2);border:1px solid var(--line);border-radius:8px}
-  .pcard.cool{opacity:.65}
-  .pcard-id{font-family:'JetBrains Mono';font-size:.76rem;color:var(--muted);min-width:60px}
+  .pool-banner-msg{font-size:var(--t-meta);color:var(--live);line-height:1.4}
+  .pool-banner-cancel{flex-shrink:0;background:none;border:1px solid rgba(232,93,61,.4);color:var(--live);border-radius:6px;font-size:var(--t-micro);padding:5px 11px;cursor:pointer}
+  .pool-banner-cancel:hover{background:var(--live);color:#1A0E08}
+  .pool-list{overflow:auto;padding:16px 22px;display:flex;flex-direction:column;gap:11px;min-height:90px}
+  .pool-empty{text-align:center;color:var(--muted);font-size:var(--t-body);padding:26px 0;line-height:1.7}.pool-empty strong{color:var(--ok)}
+  .pcard{display:flex;align-items:center;gap:13px;padding:13px 15px;background:var(--raise);border:1px solid var(--hair);border-radius:9px}
+  .pcard.cool{opacity:.6}
+  .pcard-id{font-family:'IBM Plex Mono';font-size:var(--t-meta);color:var(--muted);min-width:62px}
   .pcard-main{flex:1;min-width:0}
-  .pcard-name{font-size:.86rem;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center}
-  .pcard-meta{font-family:'JetBrains Mono';font-size:.68rem;color:var(--muted);margin-top:3px}
-  .pcard-pill{font-size:.64rem;padding:2px 8px;border-radius:10px;margin-right:7px}
-  .pill-ok{color:var(--green);background:rgba(70,199,127,.12)}
-  .pill-cool{color:var(--amber);background:rgba(255,176,32,.12)}
-  .pill-empty{color:var(--muted);background:rgba(118,130,143,.14)}
+  .pcard-name{font-size:var(--t-body);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center}
+  .pcard-meta{font-family:'IBM Plex Mono';font-size:var(--t-micro);color:var(--muted);margin-top:4px}
+  .pcard-pill{font-size:var(--t-micro);padding:2px 8px;border-radius:10px;margin-right:8px}
+  .pill-ok{color:var(--ok);background:rgba(164,178,126,.14)}
+  .pill-cool{color:var(--amber);background:rgba(232,160,77,.14)}
+  .pill-empty{color:var(--muted);background:rgba(154,145,124,.14)}
   .pcard-acts{display:flex;gap:6px;flex-shrink:0}
-  .pact{background:transparent;border:1px solid var(--line-2);color:var(--muted);border-radius:5px;font-size:.7rem;padding:5px 9px;cursor:pointer;white-space:nowrap;font-family:'Inter'}
-  .pact:hover:not(:disabled){border-color:var(--cyan);color:var(--cyan)}
-  .pact.danger:hover:not(:disabled){border-color:var(--coral);color:var(--coral)}
+  .pact{background:transparent;border:1px solid var(--hair-2);color:var(--muted);border-radius:6px;font-size:var(--t-micro);padding:6px 10px;cursor:pointer;white-space:nowrap;font-family:'Noto Sans SC'}
+  .pact:hover:not(:disabled){border-color:var(--ok);color:var(--ok)}
+  .pact.danger:hover:not(:disabled){border-color:var(--live);color:var(--live)}
   .pact:disabled{opacity:.4;cursor:not-allowed}
-  .pool-foot{padding:14px 20px 18px;border-top:1px solid var(--line)}
-  .pool-add{width:100%;background:var(--cyan);color:#06201E}
-  .pool-add:hover:not(:disabled){background:#5BE5DD}
-  .pool-warn{font-size:.72rem;color:var(--amber);margin-top:9px;line-height:1.5}
+  .pool-foot{padding:16px 22px 20px;border-top:1px solid var(--hair)}
+  .pool-add{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;background:var(--live);color:#1A0E08;border:none;border-radius:9px;font-family:'Noto Sans SC';font-weight:600;font-size:var(--t-body);cursor:pointer}
+  .pool-add:hover:not(:disabled){background:#F26B4B}
+  .pool-warn{font-size:var(--t-meta);color:var(--amber);margin-top:11px;line-height:1.5}
 
-  @media(max-width:1000px){.body{grid-template-columns:1fr}.col.right{height:55vh}}
+  @media(max-width:1000px){.body{grid-template-columns:1fr}.col.right{height:55vh}.masthead{flex-wrap:wrap}}
 </style>
 </head>
 <body>
-  <div class="topbar">
-    <div class="logo"><div class="logo-mark"></div><div class="logo-name gk">采集控制台 <span>/ JD·TMALL</span></div></div>
-    <div class="conn"><span id="status-dot" class="status-dot"></span><span id="status-text" class="mono">连接中</span></div>
-    <div class="topbar-sp"></div>
+  <div class="masthead">
+    <div class="mark"></div>
+    <div class="title-wrap">
+      <div class="title">价格采集台</div>
+      <div class="sub">批量抓取京东 / 天猫商品价格 · 多账号轮换规避风控</div>
+    </div>
+    <div class="mast-sp"></div>
     <div class="plat">
       <div class="platform-tab active" data-platform="jd">京东</div>
       <div class="platform-tab hidden" data-platform="tmall">天猫淘宝</div>
     </div>
+    <div class="conn"><span id="status-dot" class="status-dot"></span><span id="status-text">连接中</span></div>
+    <button id="btn-start" class="act btn-start" disabled><svg viewBox="0 0 13 13" fill="currentColor"><polygon points="3,1.5 11,6.5 3,11.5"/></svg>开始采集</button>
+    <button id="btn-stop" class="act btn-stop hidden"><svg viewBox="0 0 13 13" fill="currentColor"><rect x="2" y="2" width="9" height="9" rx="1.5"/></svg>停止采集</button>
   </div>
 
   <div class="body">
-    <!-- LEFT: 指挥列 -->
     <div class="col left">
-      <div class="two-col">
-        <div class="panel">
-          <div class="panel-h"><span class="idx mono">01</span><span class="ttl gk">数据源</span></div>
-          <div class="panel-b">
+      <div class="sec">
+        <div class="grid2">
+          <div>
+            <div class="sec-h"><span class="fol">01</span><h2>数据源</h2></div>
             <div id="upload-area" class="drop">
-              <svg viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M15 4v15M9 11l6-7 6 7" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20v4a2 2 0 002 2h18a2 2 0 002-2v-4" stroke-linecap="round"/></svg>
-              <strong>拖入 Excel 或点击上传</strong>
-              <small>.xlsx / .xls</small>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M12 3v12M8 8l4-5 4 5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke-linecap="round"/></svg>
+              <strong>拖入 Excel 或点击上传</strong><span class="micro">.xlsx / .xls</span>
               <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none">
             </div>
-            <div id="file-badge" class="file-badge"><span>▸</span><span id="file-badge-text">-</span></div>
+            <div id="file-badge" class="file-badge"><span id="file-badge-text">-</span><span class="micro">已载入</span></div>
             <a id="template-link" class="template-link" href="/api/template" download title="下载标准格式 Excel 模板">
-              <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 1.5 L6.5 8.5 M3 6 L6.5 9.5 L10 6"/><path d="M2 11 L11 11"/></svg>
-              下载模板
+              <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 1.5 L6.5 8.5 M3 6 L6.5 9.5 L10 6"/><path d="M2 11 L11 11"/></svg>下载模板
             </a>
           </div>
-        </div>
-        <div class="panel">
-          <div class="panel-h"><span class="idx mono">02</span><span class="ttl gk">爬取强度</span></div>
-          <div class="panel-b">
+          <div>
+            <div class="sec-h"><span class="fol">02</span><h2>采集强度</h2></div>
             <div id="speed-select" class="speed-select">
-              <button type="button" class="speed-opt active" data-speed="regular"><span class="speed-name gk">常规</span><span class="speed-spec">25 / 批</span></button>
-              <button type="button" class="speed-opt" data-speed="fast"><span class="speed-name gk">快速</span><span class="speed-spec">50 / 批</span></button>
+              <button type="button" class="speed-opt active" data-speed="regular"><span class="speed-name">常规</span><span class="speed-spec">25 / 批</span></button>
+              <button type="button" class="speed-opt" data-speed="fast"><span class="speed-name">快速</span><span class="speed-spec">50 / 批</span></button>
             </div>
             <div id="speed-hint" class="speed-hint">批间冷却 10 分钟 · <strong>最稳</strong>,默认推荐</div>
           </div>
         </div>
       </div>
 
-      <div class="panel" style="margin-top:16px">
-        <div class="panel-h"><span class="idx mono">03</span><span class="ttl gk">身份小队</span><span class="sub">账号级风控 · 批间自动轮换</span></div>
-        <div class="panel-b">
-          <div class="fleet-teaser">每个 profile 对应一个<strong>不同账号</strong>,批间自动轮换、免冷却,以规避账号级风控。在这里扫码、查看登录态、冷却或移除。</div>
-          <button id="btn-profiles" class="btn-pool">
-            <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="4.5" cy="4" r="2"/><path d="M1 11.5Q1 8 4.5 8Q8 8 8 11.5"/><circle cx="9.5" cy="4.5" r="1.6"/><path d="M9 8Q12 8.2 12 11.5"/></svg>
-            管理京东账号
-          </button>
+      <div class="sec">
+        <div class="sec-h"><span class="fol">03</span><h2>身份小队</h2><span class="micro meta">账号级风控 · 批间轮换</span></div>
+        <div class="fleet-teaser">每个 profile 对应一个<strong>不同账号</strong>,批间自动轮换、免冷却,以规避账号级风控。在这里扫码、查看登录态、冷却或移除。</div>
+        <button id="btn-profiles" class="btn-pool">
+          <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="4.5" cy="4" r="2"/><path d="M1 11.5Q1 8 4.5 8Q8 8 8 11.5"/><circle cx="9.5" cy="4.5" r="1.6"/><path d="M9 8Q12 8.2 12 11.5"/></svg>
+          管理京东账号
+        </button>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><span class="fol">04</span><h2>进度</h2><span class="micro meta">实时</span></div>
+        <div id="progress-section">
+          <div class="prog"><span id="progress-text" class="prog-cur">0</span><span class="prog-div">/</span><span id="progress-total-num" class="prog-tot">0</span><span id="progress-percent" class="prog-pct">0%</span></div>
+          <div class="track"><div id="progress-bar-fill" class="fill"></div></div>
+          <div class="prog-now"><span id="current-url">等待开始…</span></div>
+        </div>
+        <div id="stats-bar" class="stats">
+          <div class="stat s-ok"><span id="stat-success" class="sv">0</span><span class="sl">成功</span></div>
+          <div class="stat s-fail"><span id="stat-failed" class="sv">0</span><span class="sl">失败</span></div>
+          <div class="stat s-warn"><span id="stat-unavailable" class="sv">0</span><span class="sl">下架</span></div>
+          <div class="stat"><span id="stat-total" class="sv">0</span><span class="sl">合计</span></div>
+        </div>
+        <div id="completion-banner" class="done-banner">
+          <svg viewBox="0 0 14 14" stroke-linecap="round" stroke-linejoin="round"><path d="M13 6.5V7A6 6 0 1 1 9.4 1.5"/><polyline points="13 2.5 7 8.5 5.3 6.8"/></svg>
+          采集完成
+        </div>
+        <div class="post-acts">
+          <button id="btn-retry" class="btn-mini btn-retry hidden"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M1.5 6.5Q1.5 3 6.5 3L6.5 1.5L9 4.5L6.5 7.5L6.5 6Q3.5 6 3.5 8Q3.5 10 6.5 10"/></svg>重试失败项</button>
+          <button id="btn-download" class="btn-mini btn-download hidden"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M6.5 1.5L6.5 8.5M3 6L6.5 9.5L10 6"/><path d="M1.5 10L11.5 10"/></svg>下载结果</button>
+          <button id="btn-download-errors" class="btn-mini btn-err-dl hidden" title="只含失败/跳过项,可重新上传当新批次"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M6.5 1.5L6.5 8.5M3 6L6.5 9.5L10 6"/><path d="M1.5 10L11.5 10"/></svg>下载错误记录</button>
         </div>
       </div>
 
-      <div class="panel">
-        <div class="panel-h"><span class="idx mono">04</span><span class="ttl gk">运行</span></div>
-        <div class="panel-b">
-          <div class="btn-group">
-            <button id="btn-start" class="btn btn-start" disabled><svg viewBox="0 0 13 13" fill="currentColor"><polygon points="3,1.5 11,6.5 3,11.5"/></svg>开始爬取</button>
-            <button id="btn-stop" class="btn btn-stop hidden"><svg viewBox="0 0 13 13" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx=".5"/></svg>停止</button>
-            <button id="btn-retry" class="btn btn-retry hidden"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M1.5 6.5Q1.5 3 6.5 3L6.5 1.5L9 4.5L6.5 7.5L6.5 6Q3.5 6 3.5 8Q3.5 10 6.5 10"/></svg>重试失败项</button>
-            <button id="btn-download" class="btn btn-download hidden"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M6.5 1.5L6.5 8.5M3 6L6.5 9.5L10 6"/><path d="M1.5 10L11.5 10"/></svg>下载结果</button>
-            <button id="btn-download-errors" class="btn btn-err-dl hidden" title="只含失败/跳过项,可重新上传当新批次"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M6.5 1.5L6.5 8.5M3 6L6.5 9.5L10 6"/><path d="M1.5 10L11.5 10"/></svg>下载错误记录</button>
-          </div>
+      <div class="sec">
+        <div class="sec-h"><span class="fol">05</span><h2>快速查询</h2></div>
+        <div class="qc-row">
+          <input id="qc-input" class="qc-input" placeholder="商品 ID 或 URL" spellcheck="false">
+          <button id="qc-btn">查询</button>
+        </div>
+        <div id="qc-result" class="qc-result">
+          <div class="qr"><span class="ql">商品</span><span id="qc-pid" class="qv">-</span></div>
+          <div class="qr"><span class="ql">原价</span><span id="qc-price" class="qv">-</span></div>
+          <div class="qr"><span class="ql">促销价</span><span id="qc-promo" class="qv">-</span></div>
+          <div class="qr"><span class="ql">状态</span><span id="qc-status" class="qv">-</span></div>
         </div>
       </div>
 
-      <div class="panel">
-        <div class="panel-h"><span class="idx mono">05</span><span class="ttl gk">进度</span></div>
-        <div class="panel-b">
-          <div id="progress-section">
-            <div class="prog-row"><span id="progress-text" class="prog-cur mono">0</span><span class="prog-div">/</span><span id="progress-total-num" class="prog-tot mono">0</span><span id="progress-percent" class="prog-pct mono">0%</span></div>
-            <div class="track"><div id="progress-bar-fill" class="fill"></div></div>
-            <div class="prog-current"><span id="current-url">等待开始…</span></div>
-          </div>
-          <div id="stats-bar" class="stats">
-            <div class="stat s-ok"><span id="stat-success" class="sv mono">0</span><span class="sl">成功</span></div>
-            <div class="stat s-fail"><span id="stat-failed" class="sv mono">0</span><span class="sl">失败</span></div>
-            <div class="stat s-warn"><span id="stat-unavailable" class="sv mono">0</span><span class="sl">下架</span></div>
-            <div class="stat s-total"><span id="stat-total" class="sv mono">0</span><span class="sl">合计</span></div>
-          </div>
-          <div id="completion-banner" class="done-banner">
-            <svg viewBox="0 0 14 14" stroke-linecap="round" stroke-linejoin="round"><path d="M13 6.5V7A6 6 0 1 1 9.4 1.5"/><polyline points="13 2.5 7 8.5 5.3 6.8"/></svg>
-            爬取完成
-          </div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-h"><span class="idx mono">06</span><span class="ttl gk">快速查询</span></div>
-        <div class="panel-b">
-          <div class="qc-row">
-            <input id="qc-input" class="qc-input" placeholder="商品 ID 或 URL" spellcheck="false">
-            <button id="qc-btn">查询</button>
-          </div>
-          <div id="qc-result" class="qc-result">
-            <div class="qr"><span class="ql">商品</span><span id="qc-pid" class="qv">-</span></div>
-            <div class="qr"><span class="ql">原价</span><span id="qc-price" class="qv">-</span></div>
-            <div class="qr"><span class="ql">促销价</span><span id="qc-promo" class="qv">-</span></div>
-            <div class="qr"><span class="ql">状态</span><span id="qc-status" class="qv">-</span></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel reset-section">
-        <div class="panel-h"><span class="idx mono">07</span><span class="ttl gk" style="color:var(--coral)">故障恢复</span></div>
-        <div class="panel-b">
-          <button id="btn-reset-browser" class="btn-reset">
-            <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M2 6.5Q2 3 6 3Q8 3 9.5 4.5L11 3M11 3L11 6M11 3L8 3"/><path d="M11 6.5Q11 10 7 10Q5 10 3.5 8.5L2 10M2 10L2 7M2 10L5 10"/></svg>
-            重置浏览器会话
-          </button>
-          <div class="reset-hint">看到 <strong>热身失败</strong>、长时间空闲后再开爬、或关过 chromium 窗口时,点这里清掉旧会话。</div>
-        </div>
+      <div class="sec">
+        <div class="sec-h"><span class="fol">06</span><h2 style="color:var(--live)">故障恢复</h2></div>
+        <button id="btn-reset-browser" class="btn-reset">
+          <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M2 6.5Q2 3 6 3Q8 3 9.5 4.5L11 3M11 3L11 6M11 3L8 3"/><path d="M11 6.5Q11 10 7 10Q5 10 3.5 8.5L2 10M2 10L2 7M2 10L5 10"/></svg>
+          重置浏览器会话
+        </button>
+        <div class="reset-hint">看到 <strong>热身失败</strong>、长时间空闲后再开爬、或关过 chromium 窗口时,点这里清掉旧会话。</div>
       </div>
     </div>
 
-    <!-- RIGHT: 实时流 -->
     <div class="col right">
       <div class="tab-bar">
         <div class="tab-item active" data-tab="preview">数据预览<span id="preview-count" class="tc">0</span></div>
-        <div class="tab-item" data-tab="results">爬取结果<span id="results-count" class="tc">0</span></div>
+        <div class="tab-item" data-tab="results">采集结果<span id="results-count" class="tc">0</span></div>
         <div class="tab-item" data-tab="log">运行日志<span id="log-count" class="tc">0</span></div>
         <div class="tab-item" data-tab="history">历史记录</div>
         <div class="tab-spacer"></div>
@@ -380,22 +353,16 @@
             <div class="empty-text">上传文件后预览数据</div>
           </div>
           <div id="preview-table-wrap" class="table-wrap hidden">
-            <table class="data-table">
-              <thead><tr><th style="text-align:center">#</th><th>品牌</th><th>Item</th><th>URL</th><th id="preview-id-col">Product Key</th><th style="text-align:right">参考价</th></tr></thead>
-              <tbody id="preview-tbody"></tbody>
-            </table>
+            <table class="data-table"><thead><tr><th style="text-align:center">#</th><th>品牌</th><th>Item</th><th>URL</th><th id="preview-id-col">Product Key</th><th style="text-align:right">参考价</th></tr></thead><tbody id="preview-tbody"></tbody></table>
           </div>
         </div>
         <div class="tab-pane" id="pane-results">
           <div id="results-empty" class="empty-state">
             <svg viewBox="0 0 36 36" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="14"/><polyline points="18 10 18 18 24 21"/></svg>
-            <div class="empty-text">爬取结果将在此处实时显示</div>
+            <div class="empty-text">采集结果将在此处实时显示</div>
           </div>
           <div id="results-table-wrap" class="table-wrap hidden">
-            <table class="data-table">
-              <thead><tr><th style="text-align:center">#</th><th>平台</th><th>品牌</th><th>Item</th><th>URL</th><th>状态</th><th style="text-align:right">原价</th><th style="text-align:right">促销价</th><th>时间</th></tr></thead>
-              <tbody id="results-tbody"></tbody>
-            </table>
+            <table class="data-table"><thead><tr><th style="text-align:center">#</th><th>平台</th><th>品牌</th><th>Item</th><th>URL</th><th>状态</th><th style="text-align:right">原价</th><th style="text-align:right">促销价</th><th>时间</th></tr></thead><tbody id="results-tbody"></tbody></table>
           </div>
         </div>
         <div class="tab-pane" id="pane-log">
@@ -419,7 +386,6 @@
     </div>
   </div>
 
-  <!-- 账号池管理弹窗 -->
   <div id="pool-overlay" class="pool-overlay">
     <div class="pool-modal">
       <div class="pool-head">
@@ -435,7 +401,7 @@
       </div>
       <div id="pool-list" class="pool-list"></div>
       <div class="pool-foot">
-        <button id="pool-add" class="btn pool-add">＋ 扫码新增账号</button>
+        <button id="pool-add" class="pool-add">＋ 扫码新增账号</button>
         <div id="pool-warn" class="pool-warn"></div>
       </div>
     </div>
