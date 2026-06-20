@@ -35,6 +35,7 @@ spike_tmall_result.json
 jd_chrome_profile_pool/
 jd_chrome_profile_pool.bak/
 jd_chrome_profile/
+jd_profiles_backup_*/
 
 # ChromeDriver 可执行文件
 chromedriver_*

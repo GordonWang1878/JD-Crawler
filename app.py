@@ -23,6 +23,7 @@ from werkzeug.utils import secure_filename
 # 2026-05 京东升级反爬,selenium 即便 CDP attach 也被秒拒,patchright 修补了底层指纹
 from jd_crawler_patchright import JDCrawlerViaSearch, _is_chrome_running_on_cdp_port, CDP_PORT
 from tmall_crawler import TmallCrawler, parse_tmall_item_id
+import profile_provision
 
 # 初始化Flask应用
 app = Flask(__name__)
@@ -378,6 +379,9 @@ def api_crawl_start():
     if is_crawling:
         return jsonify({'error': f'Crawler is already running ({current_platform})'}), 400
 
+    if profile_provision.is_busy():
+        return jsonify({'error': '正在配置账号(扫码/验证),请完成后再开始爬取'}), 400
+
     # 预检:profile 池必须非空(patchright 用 launch_persistent_context 直接接管 profile)
     import jd_profile_pool
     profiles = jd_profile_pool.list_available_profiles()
@@ -579,6 +583,109 @@ def api_reset_browser():
             f'{"已清理: " + ", ".join(killed) if killed else ""}'
         ),
     })
+
+# ==================== JD 账号池(profile)管理 ====================
+
+def _free_browser_for_provisioning():
+    """扫码/验证前清场:关 crawler 单例 + 杀残留 chromium,避免 profile 目录被占锁。"""
+    global crawler_instance, tmall_crawler_instance
+    for inst_name in ('crawler_instance', 'tmall_crawler_instance'):
+        inst = globals().get(inst_name)
+        if inst is None:
+            continue
+        try:
+            close_fn = getattr(inst, '_close_context', None) or getattr(inst, 'close', None)
+            if close_fn:
+                close_fn()
+        except Exception:
+            pass
+    crawler_instance = None
+    tmall_crawler_instance = None
+    _kill_stale_browser_processes()
+
+
+def _profile_emit(event, data):
+    socketio.emit(event, data)
+
+
+@app.route('/api/profiles', methods=['GET'])
+def api_profiles_list():
+    """列出 JD 账号池槽位 + 状态(空/已登录+昵称/cooldown)。"""
+    return jsonify({
+        'profiles': profile_provision.list_profiles_status(),
+        'next_id': profile_provision.next_free_id(),
+        'busy': profile_provision.is_busy(),
+        'crawling': is_crawling,
+    })
+
+
+@app.route('/api/profiles/scan', methods=['POST'])
+def api_profiles_scan():
+    """给某个 profile 扫码登录一个京东账号(后台启可见 chromium + 轮询登录态)。"""
+    if is_crawling:
+        return jsonify({'error': '正在爬取,请先停止再配置账号'}), 400
+    data = request.json or {}
+    pid = data.get('id')
+    if pid is None:
+        pid = profile_provision.next_free_id()
+    ok, err = profile_provision.start_scan(
+        int(pid), _profile_emit, before_launch=_free_browser_for_provisioning)
+    if not ok:
+        return jsonify({'error': err}), 400
+    return jsonify({'success': True, 'id': int(pid)})
+
+
+@app.route('/api/profiles/scan/cancel', methods=['POST'])
+def api_profiles_scan_cancel():
+    profile_provision.cancel()
+    return jsonify({'success': True})
+
+
+@app.route('/api/profiles/verify', methods=['POST'])
+def api_profiles_verify():
+    """验证某 profile 的登录是否仍有效。"""
+    if is_crawling:
+        return jsonify({'error': '正在爬取,请先停止再验证'}), 400
+    data = request.json or {}
+    pid = data.get('id')
+    if pid is None:
+        return jsonify({'error': '缺少 profile id'}), 400
+    ok, err = profile_provision.start_verify(
+        int(pid), _profile_emit, before_launch=_free_browser_for_provisioning)
+    if not ok:
+        return jsonify({'error': err}), 400
+    return jsonify({'success': True, 'id': int(pid)})
+
+
+@app.route('/api/profiles/cooldown', methods=['POST'])
+def api_profiles_cooldown():
+    """一键冷却/恢复某 profile(改 .cooldown 后缀,移出/移回轮换)。"""
+    if is_crawling:
+        return jsonify({'error': '正在爬取,请先停止再操作'}), 400
+    data = request.json or {}
+    pid, on = data.get('id'), bool(data.get('on'))
+    if pid is None:
+        return jsonify({'error': '缺少 profile id'}), 400
+    ok, err = profile_provision.set_cooldown(int(pid), on)
+    if not ok:
+        return jsonify({'error': err}), 400
+    return jsonify({'success': True})
+
+
+@app.route('/api/profiles/remove', methods=['POST'])
+def api_profiles_remove():
+    """移除某 profile(移到 .removed 后缀,可逆)。"""
+    if is_crawling:
+        return jsonify({'error': '正在爬取,请先停止再操作'}), 400
+    data = request.json or {}
+    pid = data.get('id')
+    if pid is None:
+        return jsonify({'error': '缺少 profile id'}), 400
+    ok, err = profile_provision.remove_profile(int(pid))
+    if not ok:
+        return jsonify({'error': err}), 400
+    return jsonify({'success': True})
+
 
 @app.route('/api/download/<filename>')
 def api_download(filename):

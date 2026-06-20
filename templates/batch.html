@@ -354,6 +354,63 @@ body {
   line-height: 1.5; letter-spacing: 0.2px;
 }
 .speed-hint strong { color: var(--cinnabar); font-weight: 600; }
+
+/* 账号池:入口按钮 + 弹窗 */
+.btn-pool {
+  width:100%; display:flex; align-items:center; justify-content:center; gap:8px;
+  padding:10px; background:transparent; color:var(--cinnabar);
+  border:1px solid rgba(194,58,42,0.4); cursor:pointer;
+  font-family:var(--font-body); font-size:0.84rem; letter-spacing:2px; transition:all .2s;
+}
+.btn-pool svg { width:15px; height:15px; flex-shrink:0; }
+.btn-pool:hover { background:rgba(194,58,42,0.06); border-color:var(--cinnabar); }
+
+.pool-overlay {
+  position:fixed; inset:0; background:rgba(44,44,44,0.45); backdrop-filter:blur(2px);
+  display:none; align-items:center; justify-content:center; z-index:1000;
+}
+.pool-overlay.vis { display:flex; }
+.pool-modal {
+  width:min(560px,92vw); max-height:86vh; display:flex; flex-direction:column;
+  background:var(--xuan); border:1px solid rgba(44,44,44,0.15);
+  box-shadow:0 18px 50px rgba(44,44,44,0.25);
+}
+.pool-head { display:flex; justify-content:space-between; align-items:flex-start; padding:18px 20px 14px; border-bottom:1px solid rgba(44,44,44,0.1); }
+.pool-title { font-family:var(--font-title); font-size:1.2rem; color:var(--ink); letter-spacing:1px; }
+.pool-sub { font-size:0.72rem; color:var(--ink-faint); margin-top:4px; line-height:1.5; }
+.pool-x { background:none; border:none; font-size:1.5rem; line-height:1; color:var(--ink-faint); cursor:pointer; padding:0 4px; }
+.pool-x:hover { color:var(--cinnabar); }
+
+.pool-banner { display:none; align-items:center; justify-content:space-between; gap:12px; margin:14px 20px 0; padding:10px 14px; background:rgba(194,58,42,0.07); border:1px solid rgba(194,58,42,0.25); }
+.pool-banner.vis { display:flex; }
+.pool-banner-msg { font-size:0.8rem; color:var(--cinnabar-dark); line-height:1.4; }
+.pool-banner-cancel { flex-shrink:0; background:none; border:1px solid rgba(194,58,42,0.4); color:var(--cinnabar); font-size:0.72rem; padding:4px 10px; cursor:pointer; }
+.pool-banner-cancel:hover { background:var(--cinnabar); color:#fff; }
+
+.pool-list { overflow:auto; padding:14px 20px; display:flex; flex-direction:column; gap:10px; min-height:80px; }
+.pool-empty { text-align:center; color:var(--ink-faint); font-size:0.82rem; padding:24px 0; line-height:1.6; }
+
+.pcard { display:flex; align-items:center; gap:12px; padding:12px 14px; background:#FBF8F2; border:1px solid rgba(44,44,44,0.1); }
+.pcard.cool { opacity:0.7; }
+.pcard-id { font-family:var(--font-num); font-size:0.9rem; color:var(--ink-faint); min-width:56px; }
+.pcard-main { flex:1; min-width:0; }
+.pcard-name { font-size:0.9rem; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pcard-meta { font-size:0.7rem; color:var(--ink-faint); margin-top:3px; }
+.pcard-pill { display:inline-block; font-size:0.66rem; padding:1px 7px; border-radius:10px; letter-spacing:.5px; margin-right:6px; }
+.pill-ok { color:#2f7d32; background:rgba(47,125,50,0.12); }
+.pill-cool { color:var(--gold); background:var(--gold-faint); }
+.pill-empty { color:var(--ink-faint); background:rgba(138,133,120,0.14); }
+.pcard-acts { display:flex; gap:6px; flex-shrink:0; }
+.pact { background:transparent; border:1px solid rgba(44,44,44,0.18); color:var(--ink-light); font-size:0.7rem; padding:5px 8px; cursor:pointer; white-space:nowrap; transition:all .15s; }
+.pact:hover:not(:disabled) { border-color:var(--ink); color:var(--ink); }
+.pact.danger:hover:not(:disabled) { border-color:var(--cinnabar); color:var(--cinnabar); }
+.pact:disabled { opacity:.4; cursor:not-allowed; }
+
+.pool-foot { padding:14px 20px 18px; border-top:1px solid rgba(44,44,44,0.1); }
+.pool-add { width:100%; }
+.pool-add:disabled { opacity:.5; cursor:not-allowed; }
+.pool-warn { font-size:0.72rem; color:var(--gold); margin-top:8px; line-height:1.5; }
+
 .hidden { display: none !important; }
 
 /* Quick query */
@@ -897,8 +954,21 @@ body {
       <div class="qr"><span class="ql">状态</span><span id="qc-status" class="qv">-</span></div>
     </div>
 
-    <!-- 故障恢复 — 低频但醒目,放在左栏最底 -->
+    <!-- 账号池管理 -->
     <div class="sec-gap" style="margin-top:32px;"></div>
+    <div class="reset-section fade-in fd3">
+      <div class="sec-label" style="color:var(--cinnabar);">账号池</div>
+      <button id="btn-profiles" class="btn-pool">
+        <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="4.5" cy="4" r="2"/><path d="M1 11.5Q1 8 4.5 8Q8 8 8 11.5"/><circle cx="9.5" cy="4.5" r="1.6"/><path d="M9 8Q12 8.2 12 11.5"/></svg>
+        管理京东账号
+      </button>
+      <div class="reset-hint">
+        每个 profile 对应一个<strong>不同账号</strong>,批间自动轮换免冷却。在这里扫码、查看登录态、冷却或移除。
+      </div>
+    </div>
+
+    <!-- 故障恢复 — 低频但醒目,放在左栏最底 -->
+    <div class="sec-gap" style="margin-top:24px;"></div>
     <div class="reset-section fade-in fd3">
       <div class="sec-label" style="color:var(--gold);">故障恢复</div>
       <button id="btn-reset-browser" class="btn-reset">
@@ -992,6 +1062,28 @@ body {
         </div>
         <div id="history-list" class="history-scroll hidden"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- 账号池管理弹窗 -->
+<div id="pool-overlay" class="pool-overlay">
+  <div class="pool-modal">
+    <div class="pool-head">
+      <div>
+        <div class="pool-title">京东账号池</div>
+        <div class="pool-sub">每个 profile = 一个独立京东账号 · 批间自动轮换以规避账号级风控</div>
+      </div>
+      <button id="pool-close" class="pool-x" aria-label="关闭">&times;</button>
+    </div>
+    <div id="pool-banner" class="pool-banner">
+      <span id="pool-banner-msg" class="pool-banner-msg">—</span>
+      <button id="pool-cancel" class="pool-banner-cancel">取消扫码</button>
+    </div>
+    <div id="pool-list" class="pool-list"></div>
+    <div class="pool-foot">
+      <button id="pool-add" class="btn btn-primary pool-add">＋ 扫码新增账号</button>
+      <div id="pool-warn" class="pool-warn"></div>
     </div>
   </div>
 </div>
@@ -1477,6 +1569,121 @@ body {
   }
 
   function now() { return new Date().toLocaleTimeString(); }
+
+  // ===== 账号池管理 =====
+  const poolOverlay = $('pool-overlay');
+  let poolBusy = false;  // 扫码/验证进行中
+
+  $('btn-profiles').addEventListener('click', openPool);
+  $('pool-close').addEventListener('click', closePool);
+  poolOverlay.addEventListener('click', e => { if (e.target === poolOverlay) closePool(); });
+  $('pool-add').addEventListener('click', () => startScan(null));
+  $('pool-cancel').addEventListener('click', () => fetch('/api/profiles/scan/cancel', { method:'POST' }));
+
+  function openPool() { poolOverlay.classList.add('vis'); hideBanner(); loadProfiles(); }
+  function closePool() { if (poolBusy) return; poolOverlay.classList.remove('vis'); }
+
+  function loadProfiles() { fetch('/api/profiles').then(r => r.json()).then(renderPool); }
+
+  function renderPool(data) {
+    const list = $('pool-list'), warn = $('pool-warn');
+    const profs = data.profiles || [];
+    list.innerHTML = profs.length
+      ? profs.map(cardHtml).join('')
+      : '<div class="pool-empty">还没有配置任何账号。<br>点下方「扫码新增账号」,每个 profile 扫一个<strong>不同</strong>的京东账号。</div>';
+    const usable = profs.filter(p => !p.cooldown && p.configured).length;
+    if (data.crawling) warn.textContent = '⚠ 正在爬取,账号配置已锁定,停止后可操作。';
+    else if (usable < 2) warn.textContent = `⚠ 当前 ${usable} 个可用账号,不足 2 个无法账号交替(会退回单账号+10分钟冷却)。建议凑满 2 个不同账号。`;
+    else warn.textContent = `✓ ${usable} 个可用账号,批间将自动轮换。`;
+    const lock = poolBusy || !!data.crawling;
+    list.querySelectorAll('[data-act]').forEach(b => {
+      b.addEventListener('click', () => {
+        const id = parseInt(b.dataset.id), act = b.dataset.act;
+        if (act === 'scan') startScan(id);
+        else if (act === 'verify') verifyProfile(id);
+        else if (act === 'cooldown') toggleCooldown(id, b.dataset.on === '1');
+        else if (act === 'remove') removeProfile(id);
+      });
+      b.disabled = lock;
+    });
+    $('pool-add').disabled = lock;
+  }
+
+  function cardHtml(p) {
+    let pill, name, meta;
+    if (p.cooldown) {
+      pill = '<span class="pcard-pill pill-cool">❄ 冷却中</span>';
+      name = p.nickname || '(已配置)';
+      meta = '已移出轮换' + (p.scanned_at ? ' · ' + p.scanned_at : '');
+    } else if (p.configured) {
+      pill = '<span class="pcard-pill pill-ok">✓ 已登录</span>';
+      name = p.nickname || '(未取到昵称)';
+      meta = p.scanned_at ? '扫码于 ' + p.scanned_at : '';
+    } else {
+      pill = '<span class="pcard-pill pill-empty">空槽位</span>'; name = '未扫码'; meta = '';
+    }
+    const coolBtn = p.cooldown
+      ? `<button class="pact" data-act="cooldown" data-id="${p.id}" data-on="0">恢复</button>`
+      : `<button class="pact" data-act="cooldown" data-id="${p.id}" data-on="1">冷却</button>`;
+    const verifyBtn = (p.configured && !p.cooldown)
+      ? `<button class="pact" data-act="verify" data-id="${p.id}">验证</button>` : '';
+    return `<div class="pcard ${p.cooldown?'cool':''}">
+      <div class="pcard-id">profile_${p.id}</div>
+      <div class="pcard-main">
+        <div class="pcard-name">${pill}${esc(name)}</div>
+        <div class="pcard-meta">${esc(meta)}</div>
+      </div>
+      <div class="pcard-acts">
+        <button class="pact" data-act="scan" data-id="${p.id}">${p.configured?'重扫':'扫码'}</button>
+        ${verifyBtn}${coolBtn}
+        <button class="pact danger" data-act="remove" data-id="${p.id}">移除</button>
+      </div>
+    </div>`;
+  }
+
+  function poolPost(url, body) {
+    return fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body||{}) }).then(r => r.json());
+  }
+  function startScan(id) {
+    poolPost('/api/profiles/scan', id ? {id} : {}).then(d => {
+      if (d.error) { showBanner(d.error, false); return; }
+      poolBusy = true; renderLock();
+    });
+  }
+  function verifyProfile(id) {
+    poolPost('/api/profiles/verify', {id}).then(d => {
+      if (d.error) showBanner(d.error, false); else { poolBusy = true; renderLock(); }
+    });
+  }
+  function toggleCooldown(id, on) {
+    poolPost('/api/profiles/cooldown', {id, on}).then(d => d.error ? showBanner(d.error, false) : loadProfiles());
+  }
+  function removeProfile(id) {
+    if (!confirm('移除 profile_' + id + '?(目录会移到 .removed 备份,可恢复)')) return;
+    poolPost('/api/profiles/remove', {id}).then(d => d.error ? showBanner(d.error, false) : loadProfiles());
+  }
+  function renderLock() {
+    $('pool-list').querySelectorAll('.pact').forEach(b => b.disabled = true);
+    $('pool-add').disabled = true;
+  }
+
+  function showBanner(msg, withCancel) {
+    $('pool-banner-msg').innerHTML = msg;
+    $('pool-cancel').style.display = withCancel ? '' : 'none';
+    $('pool-banner').classList.add('vis');
+  }
+  function hideBanner() { $('pool-banner').classList.remove('vis'); }
+
+  socket.on('profile_scan', d => {
+    const terminal = ['success','timeout','cancelled','error','verified_ok','verified_expired'];
+    showBanner(`profile_${d.id}:${d.message}`, d.stage === 'waiting');
+    if (terminal.includes(d.stage)) {
+      poolBusy = false;
+      const good = (d.stage === 'success' || d.stage === 'verified_ok');
+      loadProfiles();
+      setTimeout(() => { hideBanner(); loadProfiles(); }, good ? 1600 : 2600);
+    }
+  });
 })();
 </script>
 </body>
