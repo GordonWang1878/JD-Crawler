@@ -47,6 +47,10 @@
   .btn-start:disabled{background:var(--raise);color:var(--dim);cursor:not-allowed}
   .btn-stop{background:var(--live);color:#1A0E08}.btn-stop svg{fill:#1A0E08}
   .btn-stop:hover{background:#F26B4B}
+  /* 结束采集后生成 Excel 期间的过渡反馈 */
+  .prepare{display:flex;align-items:center;gap:9px;padding:12px 20px;border:1px solid var(--hair-2);border-radius:9px;color:var(--muted);font-size:var(--t-body);font-weight:500;flex-shrink:0;white-space:nowrap}
+  .prepare .spin{width:14px;height:14px;border:2px solid var(--hair-2);border-top-color:var(--live);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
 
   .body{display:grid;grid-template-columns:32% 68%;height:calc(100vh - 81px)}
   .col{overflow-y:auto}
@@ -343,6 +347,7 @@
           </div>
           <button id="btn-start" class="act btn-start" disabled><svg viewBox="0 0 13 13" fill="currentColor"><polygon points="3,1.5 11,6.5 3,11.5"/></svg>开始采集</button>
           <button id="btn-stop" class="act btn-stop hidden"><svg viewBox="0 0 13 13" fill="currentColor"><rect x="2" y="2" width="9" height="9" rx="1.5"/></svg>停止采集</button>
+          <div id="prepare-indicator" class="prepare hidden"><span class="spin"></span>正在准备结果…</div>
         </div>
         <div class="track"><div id="progress-bar-fill" class="fill"></div></div>
         <div class="sum-foot">
@@ -576,10 +581,16 @@
 
   socket.on('result_row', row => addResultRow(row));
 
+  // 采集结束后后台正在生成可下载 Excel —— 显示「正在准备结果…」过渡反馈
+  socket.on('crawl_saving', () => { hide($('btn-start')); hide($('btn-stop')); show($('prepare-indicator')); });
+
   socket.on('crawl_complete', data => {
     const platform = data.platform || currentPlatform;
     const platformLabel = (API[platform] || API.jd).label;
     setSpeedEnabled(true);
+    hide($('prepare-indicator'));   // 结果已就绪,撤掉过渡提示
+    // 结束后恢复「开始采集」(可再次运行;按是否已上传文件决定可点)
+    show($('btn-start')); $('btn-start').disabled = !ps().uploadedFilePath;
     if (data.success) {
       appendLog({ timestamp: now(), level: 'INFO', message: `[${platformLabel}] 爬取完成!` });
       platformState[platform].outputFileName = data.output_file;
@@ -783,7 +794,9 @@
   });
 
   $('btn-stop').addEventListener('click', () => {
-    fetch('/api/crawl/stop', { method: 'POST' }).then(() => { show($('btn-start')); hide($('btn-stop')); setSpeedEnabled(true); });
+    // 立刻给反馈:进入「正在准备结果」过渡态(不再秒显开始按钮);真正就绪由 crawl_complete 收尾
+    hide($('btn-stop')); show($('prepare-indicator'));
+    fetch('/api/crawl/stop', { method: 'POST' });
   });
 
   $('btn-reset-browser').addEventListener('click', () => {
@@ -1047,14 +1060,16 @@
   if($('pool-list')) new MutationObserver(()=>step3(document.querySelectorAll('#pool-list .pill-ok').length)).observe($('pool-list'), {childList:true, subtree:true});
   if($('pool-overlay')) new MutationObserver(()=>{ if(!$('pool-overlay').classList.contains('vis')) step3Fetch(); }).observe($('pool-overlay'), {attributes:true, attributeFilter:['class']});
 
-  // 采集进行中锁定整个设置栏:「停止采集」可见 ⟺ 正在采集
+  // 采集进行中 / 正在准备结果时锁定整个设置栏(「停止采集」可见 或 「准备结果」指示器可见)
   function syncLock(){
-    const crawling = $('btn-stop') && !$('btn-stop').classList.contains('hidden');
+    const stop = $('btn-stop'), prep = $('prepare-indicator');
+    const busy = (stop && !stop.classList.contains('hidden')) || (prep && !prep.classList.contains('hidden'));
     const left = document.querySelector('.col.left');
-    if(left) left.classList.toggle('locked', !!crawling);
+    if(left) left.classList.toggle('locked', !!busy);
   }
   syncLock();
   if($('btn-stop')) new MutationObserver(syncLock).observe($('btn-stop'), {attributes:true, attributeFilter:['class']});
+  if($('prepare-indicator')) new MutationObserver(syncLock).observe($('prepare-indicator'), {attributes:true, attributeFilter:['class']});
 })();
 </script>
 </body>

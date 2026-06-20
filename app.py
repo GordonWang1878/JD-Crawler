@@ -1273,6 +1273,8 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
         # 的其余行原样保留,本次结果就地替换对应行。用列表+身份匹配(不是按 URL 建字典),
         # 因为同 URL 不同 Item 是合法的多行,字典会把它们折叠丢行。
         emit_log('INFO', 'Saving results to Excel...')
+        # 通知前端:开始生成可下载的 Excel(覆盖正常结束/停止/会话异常所有结束路径)
+        socketio.emit('crawl_saving', {'platform': 'jd'})
 
         def _to_excel_row(r):
             return {
