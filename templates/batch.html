@@ -57,6 +57,11 @@
   .sec-h .fol{font-family:'IBM Plex Mono';font-size:var(--t-meta);color:var(--live);font-weight:500}
   .sec-h h2{font-weight:700;font-size:var(--t-h2);letter-spacing:.3px;color:var(--num)}
   .sec-h .meta{margin-left:auto}
+  /* 每步完成状态指示点:空心=未完成 / 半填=可运行非最佳 / 实心=完成 */
+  .step-dot{width:11px;height:11px;border-radius:50%;border:1.5px solid var(--ok);box-sizing:border-box;flex-shrink:0;margin-left:-3px;transition:.2s}
+  .step-dot.s-empty{background:transparent}
+  .step-dot.s-half{background:linear-gradient(90deg,var(--ok) 50%,transparent 50%)}
+  .step-dot.s-done{background:var(--ok)}
   .grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:30px}
 
   /* upload */
@@ -267,7 +272,7 @@
       <div class="sec">
         <div class="grid2">
           <div>
-            <div class="sec-h"><span class="fol">01</span><h2>数据源</h2></div>
+            <div class="sec-h"><span class="fol">01</span><h2>数据源</h2><span id="dot-1" class="step-dot s-empty" title="未完成"></span></div>
             <div id="upload-area" class="drop">
               <svg class="ico-empty" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M12 3v12M8 8l4-5 4 5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke-linecap="round"/></svg>
               <svg class="ico-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12.5l4.5 4.5L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -283,7 +288,7 @@
             </a>
           </div>
           <div>
-            <div class="sec-h"><span class="fol">02</span><h2>采集强度</h2></div>
+            <div class="sec-h"><span class="fol">02</span><h2>采集强度</h2><span id="dot-2" class="step-dot s-done" title="已完成"></span></div>
             <div id="speed-select" class="speed-select">
               <button type="button" class="speed-opt active" data-speed="regular"><span class="speed-name">常规</span><span class="speed-spec">25 / 批</span></button>
               <button type="button" class="speed-opt" data-speed="fast"><span class="speed-name">快速</span><span class="speed-spec">50 / 批</span></button>
@@ -294,7 +299,7 @@
       </div>
 
       <div class="sec">
-        <div class="sec-h"><span class="fol">03</span><h2>身份小队</h2><span class="micro meta">账号级风控 · 批间轮换</span></div>
+        <div class="sec-h"><span class="fol">03</span><h2>身份小队</h2><span id="dot-3" class="step-dot s-empty" title="未完成"></span><span class="micro meta">账号级风控 · 批间轮换</span></div>
         <div class="fleet-teaser">每个 profile 对应一个<strong>不同账号</strong>,批间自动轮换、免冷却,以规避账号级风控。在这里扫码、查看登录态、冷却或移除。</div>
         <button id="btn-profiles" class="btn-pool">
           <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="4.5" cy="4" r="2"/><path d="M1 11.5Q1 8 4.5 8Q8 8 8 11.5"/><circle cx="9.5" cy="4.5" r="1.6"/><path d="M9 8Q12 8.2 12 11.5"/></svg>
@@ -1016,6 +1021,29 @@
       setTimeout(() => { hideBanner(); loadProfiles(); }, good ? 1600 : 2600);
     }
   });
+})();
+</script>
+<script>
+/* 每步完成状态指示点 —— 独立脚本,靠观察 DOM + 拉 /api/profiles 驱动,不依赖主逻辑闭包 */
+(function(){
+  const $ = id => document.getElementById(id);
+  const TITLE = {empty:'未完成', half:'可运行,但非最佳', done:'已完成'};
+  function setDot(el, state){ if(el){ el.className = 'step-dot s-' + state; el.title = TITLE[state]; } }
+
+  // Step 1:有文件 = 完成
+  function step1(){ setDot($('dot-1'), $('upload-area') && $('upload-area').classList.contains('uploaded') ? 'done' : 'empty'); }
+  // Step 2:常规 = 完成,快速 = 一半(能跑但风控风险略升)
+  function step2(){ const a = document.querySelector('.speed-opt.active'); setDot($('dot-2'), (a && a.dataset.speed === 'fast') ? 'half' : 'done'); }
+  // Step 3:0 可用账号 = 未完成,1 = 一半(单账号回退冷却),≥2 = 完成(可账号交替)
+  function step3(n){ setDot($('dot-3'), n >= 2 ? 'done' : (n === 1 ? 'half' : 'empty')); }
+  function step3Fetch(){ fetch('/api/profiles').then(r=>r.json()).then(d=>{ step3(((d.profiles)||[]).filter(p=>p.configured && !p.cooldown).length); }).catch(()=>{}); }
+
+  step1(); step2(); step3Fetch();
+  if($('upload-area')) new MutationObserver(step1).observe($('upload-area'), {attributes:true, attributeFilter:['class']});
+  if($('speed-select')) new MutationObserver(step2).observe($('speed-select'), {subtree:true, attributes:true, attributeFilter:['class']});
+  // 账号池弹窗里增删改后 pool-list 会重渲染,据渲染出的已登录卡片(.pill-ok)实时更新;关闭弹窗再兜底拉一次
+  if($('pool-list')) new MutationObserver(()=>step3(document.querySelectorAll('#pool-list .pill-ok').length)).observe($('pool-list'), {childList:true, subtree:true});
+  if($('pool-overlay')) new MutationObserver(()=>{ if(!$('pool-overlay').classList.contains('vis')) step3Fetch(); }).observe($('pool-overlay'), {attributes:true, attributeFilter:['class']});
 })();
 </script>
 </body>
