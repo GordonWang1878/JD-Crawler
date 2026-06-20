@@ -48,7 +48,7 @@
   .btn-stop{background:var(--live);color:#1A0E08}.btn-stop svg{fill:#1A0E08}
   .btn-stop:hover{background:#F26B4B}
 
-  .body{display:grid;grid-template-columns:40% 60%;height:calc(100vh - 81px)}
+  .body{display:grid;grid-template-columns:32% 68%;height:calc(100vh - 81px)}
   .col{overflow-y:auto}
   .col.right{border-left:1px solid var(--hair);display:flex;flex-direction:column}
 
@@ -121,6 +121,21 @@
   .stat.s-ok .sv{color:var(--ok)}.stat.s-fail .sv{color:var(--live)}.stat.s-warn .sv{color:var(--amber)}
   .stat .sl{display:block;font-family:'IBM Plex Mono';font-size:var(--t-micro);letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:5px}
   .post-acts{display:flex;gap:9px;margin-top:22px}
+  /* 进度汇总条 —— 右栏顶部,采集结果汇总 */
+  .summary{padding:18px 22px;border-bottom:1px solid var(--hair);flex-shrink:0}
+  .sum-row{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+  .summary .prog{padding-bottom:0;border:none;gap:12px}
+  .summary .prog-cur{font-size:2.6rem;letter-spacing:-2px}
+  .summary .prog-div,.summary .prog-tot{font-size:.95rem;margin-bottom:5px}
+  .summary .prog-pct{margin-left:14px;font-size:1.05rem;margin-bottom:5px}
+  .summary .stats{display:flex;gap:22px;margin-top:0}
+  .summary .stat{padding:0;border:none}
+  .summary .stat .sv{font-size:1.3rem}
+  .summary .track{margin-top:14px}
+  .sum-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:12px}
+  .summary .prog-now{margin-top:0;flex:1;min-width:0}
+  .summary .post-acts{margin-top:0;flex-shrink:0}
+  .summary .done-banner{margin-top:14px}
   .done-banner{display:none;align-items:center;gap:9px;margin-top:18px;padding:10px 14px;border:1px solid rgba(164,178,126,.35);background:rgba(164,178,126,.08);border-radius:8px;color:var(--ok);font-size:var(--t-body);font-weight:500}
   .done-banner.vis{display:flex}.done-banner svg{width:14px;height:14px;fill:none;stroke:var(--ok);stroke-width:1.5}
   .btn-mini{display:flex;align-items:center;gap:7px;padding:10px 14px;border-radius:8px;font-family:'Noto Sans SC';font-size:var(--t-meta);font-weight:500;cursor:pointer;border:1px solid var(--hair-2);background:transparent}
@@ -277,7 +292,7 @@
               <svg class="ico-empty" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M12 3v12M8 8l4-5 4 5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke-linecap="round"/></svg>
               <svg class="ico-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12.5l4.5 4.5L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
               <div class="drop-cap">
-                <strong class="cap-empty">拖入 Excel 或点击上传</strong><span class="micro cap-empty">.xlsx / .xls</span>
+                <strong class="cap-empty">拖入或点击上传</strong><span class="micro cap-empty">.xlsx / .xls</span>
                 <strong class="cap-done">文件已载入</strong><span class="micro cap-done">点击可重新上传</span>
               </div>
               <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none">
@@ -308,45 +323,7 @@
       </div>
 
       <div class="sec">
-        <div class="sec-h"><span class="fol">04</span><h2>进度</h2><span class="micro meta">实时</span></div>
-        <div id="progress-section">
-          <div class="prog"><span id="progress-text" class="prog-cur">0</span><span class="prog-div">/</span><span id="progress-total-num" class="prog-tot">0</span><span id="progress-percent" class="prog-pct">0%</span></div>
-          <div class="track"><div id="progress-bar-fill" class="fill"></div></div>
-          <div class="prog-now"><span id="current-url">等待开始…</span></div>
-        </div>
-        <div id="stats-bar" class="stats">
-          <div class="stat s-ok"><span id="stat-success" class="sv">0</span><span class="sl">成功</span></div>
-          <div class="stat s-fail"><span id="stat-failed" class="sv">0</span><span class="sl">失败</span></div>
-          <div class="stat s-warn"><span id="stat-unavailable" class="sv">0</span><span class="sl">下架</span></div>
-          <div class="stat"><span id="stat-total" class="sv">0</span><span class="sl">合计</span></div>
-        </div>
-        <div id="completion-banner" class="done-banner">
-          <svg viewBox="0 0 14 14" stroke-linecap="round" stroke-linejoin="round"><path d="M13 6.5V7A6 6 0 1 1 9.4 1.5"/><polyline points="13 2.5 7 8.5 5.3 6.8"/></svg>
-          采集完成
-        </div>
-        <div class="post-acts">
-          <button id="btn-retry" class="btn-mini btn-retry hidden"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M1.5 6.5Q1.5 3 6.5 3L6.5 1.5L9 4.5L6.5 7.5L6.5 6Q3.5 6 3.5 8Q3.5 10 6.5 10"/></svg>重试失败项</button>
-          <button id="btn-download" class="btn-mini btn-download hidden"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M6.5 1.5L6.5 8.5M3 6L6.5 9.5L10 6"/><path d="M1.5 10L11.5 10"/></svg>下载结果</button>
-          <button id="btn-download-errors" class="btn-mini btn-err-dl hidden" title="只含失败/跳过项,可重新上传当新批次"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M6.5 1.5L6.5 8.5M3 6L6.5 9.5L10 6"/><path d="M1.5 10L11.5 10"/></svg>下载错误记录</button>
-        </div>
-      </div>
-
-      <div class="sec">
-        <div class="sec-h"><span class="fol">05</span><h2>快速查询</h2></div>
-        <div class="qc-row">
-          <input id="qc-input" class="qc-input" placeholder="商品 ID 或 URL" spellcheck="false">
-          <button id="qc-btn">查询</button>
-        </div>
-        <div id="qc-result" class="qc-result">
-          <div class="qr"><span class="ql">商品</span><span id="qc-pid" class="qv">-</span></div>
-          <div class="qr"><span class="ql">原价</span><span id="qc-price" class="qv">-</span></div>
-          <div class="qr"><span class="ql">促销价</span><span id="qc-promo" class="qv">-</span></div>
-          <div class="qr"><span class="ql">状态</span><span id="qc-status" class="qv">-</span></div>
-        </div>
-      </div>
-
-      <div class="sec">
-        <div class="sec-h"><span class="fol">06</span><h2 style="color:var(--live)">故障恢复</h2></div>
+        <div class="sec-h"><span class="fol">04</span><h2 style="color:var(--live)">故障恢复</h2></div>
         <button id="btn-reset-browser" class="btn-reset">
           <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M2 6.5Q2 3 6 3Q8 3 9.5 4.5L11 3M11 3L11 6M11 3L8 3"/><path d="M11 6.5Q11 10 7 10Q5 10 3.5 8.5L2 10M2 10L2 7M2 10L5 10"/></svg>
           重置浏览器会话
@@ -356,6 +333,30 @@
     </div>
 
     <div class="col right">
+      <div class="summary">
+        <div class="sum-row">
+          <div class="prog"><span id="progress-text" class="prog-cur">0</span><span class="prog-div">/</span><span id="progress-total-num" class="prog-tot">0</span><span id="progress-percent" class="prog-pct">0%</span></div>
+          <div id="stats-bar" class="stats">
+            <div class="stat s-ok"><span id="stat-success" class="sv">0</span><span class="sl">成功</span></div>
+            <div class="stat s-fail"><span id="stat-failed" class="sv">0</span><span class="sl">失败</span></div>
+            <div class="stat s-warn"><span id="stat-unavailable" class="sv">0</span><span class="sl">下架</span></div>
+            <div class="stat"><span id="stat-total" class="sv">0</span><span class="sl">合计</span></div>
+          </div>
+        </div>
+        <div class="track"><div id="progress-bar-fill" class="fill"></div></div>
+        <div class="sum-foot">
+          <div class="prog-now"><span id="current-url">等待开始…</span></div>
+          <div class="post-acts">
+            <button id="btn-retry" class="btn-mini btn-retry hidden"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M1.5 6.5Q1.5 3 6.5 3L6.5 1.5L9 4.5L6.5 7.5L6.5 6Q3.5 6 3.5 8Q3.5 10 6.5 10"/></svg>重试失败项</button>
+            <button id="btn-download" class="btn-mini btn-download hidden"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M6.5 1.5L6.5 8.5M3 6L6.5 9.5L10 6"/><path d="M1.5 10L11.5 10"/></svg>下载结果</button>
+            <button id="btn-download-errors" class="btn-mini btn-err-dl hidden" title="只含失败/跳过项,可重新上传当新批次"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M6.5 1.5L6.5 8.5M3 6L6.5 9.5L10 6"/><path d="M1.5 10L11.5 10"/></svg>下载错误记录</button>
+          </div>
+        </div>
+        <div id="completion-banner" class="done-banner">
+          <svg viewBox="0 0 14 14" stroke-linecap="round" stroke-linejoin="round"><path d="M13 6.5V7A6 6 0 1 1 9.4 1.5"/><polyline points="13 2.5 7 8.5 5.3 6.8"/></svg>
+          采集完成
+        </div>
+      </div>
       <div class="tab-bar">
         <div class="tab-item active" data-tab="preview">数据预览<span id="preview-count" class="tc">0</span></div>
         <div class="tab-item" data-tab="results">采集结果<span id="results-count" class="tc">0</span></div>
@@ -830,9 +831,9 @@
     });
   });
 
-  // Quick check
-  $('qc-btn').addEventListener('click', doQC);
-  $('qc-input').addEventListener('keydown', e => { if (e.key === 'Enter') doQC(); });
+  // Quick check（功能已下线;元素可能不存在,做空值守护避免初始化报错）
+  if ($('qc-btn')) $('qc-btn').addEventListener('click', doQC);
+  if ($('qc-input')) $('qc-input').addEventListener('keydown', e => { if (e.key === 'Enter') doQC(); });
   function doQC() {
     if (currentPlatform !== 'jd') return;  // 天猫不支持快速查询
     const val = $('qc-input').value.trim();
