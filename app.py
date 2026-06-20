@@ -1076,6 +1076,7 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
 
         global_idx = 0
         user_stopped = False
+        session_dead = False  # 浏览器会话异常死亡(被关/崩溃)—— 与"真·反爬"区分,触发后如实报告并中止
         # 一旦发现无法账号交替(只有 1 个可用账号),本次任务后续直接走冷却,
         # 不再每批反复尝试 rotate(避免对登录过期的 profile 反复 close/launch 的无谓 churn)
         single_account_mode = False
@@ -1112,15 +1113,24 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
                     items_since_walk = 0
                     next_walk_at = random.randint(10, 15)
 
-                # 反爬冷却(单批内突发失败):首次失败就立即触发
+                # 单批内突发失败:先分清「浏览器会话已死(被关/崩溃)」还是「真·反爬」
                 if consecutive_failures >= 2:
+                    # 走 CDP 真探活。会话死了就如实中止,绝不误报成反爬去冷却重试。
+                    if not crawler.is_session_valid():
+                        emit_log('ERROR', '❌ 浏览器会话异常停止(可能被外部关闭或崩溃),已中止本次采集')
+                        emit_log('ERROR', '   这不是反爬。请点「重置浏览器会话」后重新开始。')
+                        session_dead = True
+                        is_crawling = False
+                        break
+
+                    # 会话健康 → 判定为真·反爬,冷却
                     anti_crawl_cooldowns += 1
                     cooldown = min(30 + anti_crawl_cooldowns * 30, 120)
                     emit_log('WARNING', f'检测到反爬,冷却{cooldown}秒... (第{anti_crawl_cooldowns}次)')
                     time.sleep(cooldown)
                     consecutive_failures = 0
 
-                    # 冷却后先访问京东首页"重置"会话
+                    # 冷却后先访问京东首页"重置"会话;若此时会话已死,同样如实中止
                     try:
                         emit_log('INFO', '重置会话:访问京东首页...')
                         crawler.driver.get("https://www.jd.com")
@@ -1131,8 +1141,10 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
                         time.sleep(1)
                     except Exception:
                         if not crawler.is_session_valid():
-                            emit_log('INFO', '会话失效,重启浏览器...')
-                            crawler.restart_browser()
+                            emit_log('ERROR', '❌ 浏览器会话异常停止,已中止本次采集。请重置浏览器后重试')
+                            session_dead = True
+                            is_crawling = False
+                            break
 
                 row = process_single_row(crawler, input_row, idx, total, batch_time)
                 if not row:
@@ -1348,6 +1360,18 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
         emit_log('INFO', f'  Duration: {duration:.1f}s')
         emit_log('INFO', f'  Output: {os.path.basename(output_filepath)}')
         emit_log('INFO', '=' * 50)
+
+        if session_dead:
+            emit_log('ERROR', f'本次因浏览器会话异常而中止 —— 已采集的 {success_count} 条结果已保存(可在「历史记录」下载)')
+            socketio.emit('crawl_complete', {
+                'success': False,
+                'platform': 'jd',
+                'error': '浏览器会话异常停止(被关闭或崩溃),已中止。请点「重置浏览器会话」后重试。',
+            })
+            is_crawling = False
+            current_platform = None
+            current_results = live_results
+            return
 
         socketio.emit('crawl_complete', {
             'success': True,
