@@ -581,33 +581,44 @@
 
   socket.on('result_row', row => addResultRow(row));
 
-  // 采集结束后后台正在生成可下载 Excel —— 显示「正在准备结果…」过渡反馈
-  socket.on('crawl_saving', () => { hide($('btn-start')); hide($('btn-stop')); show($('prepare-indicator')); });
+  // 「正在准备结果…」过渡反馈:在 结束采集→生成 Excel 期间显示
+  let prepareShownAt = 0;
+  const PREPARE_MIN_MS = 800;   // 最短显示时长,保证会话异常/快速结束等情况也看得见
+  function showPrepare() {
+    hide($('btn-start')); hide($('btn-stop'));
+    if ($('prepare-indicator').classList.contains('hidden')) prepareShownAt = Date.now();
+    show($('prepare-indicator'));
+  }
+  // 后端开始生成 Excel(覆盖正常结束/停止/会话异常所有路径)
+  socket.on('crawl_saving', showPrepare);
 
   socket.on('crawl_complete', data => {
     const platform = data.platform || currentPlatform;
     const platformLabel = (API[platform] || API.jd).label;
-    setSpeedEnabled(true);
-    hide($('prepare-indicator'));   // 结果已就绪,撤掉过渡提示
-    // 结束后恢复「开始采集」(可再次运行;按是否已上传文件决定可点)
-    show($('btn-start')); $('btn-start').disabled = !ps().uploadedFilePath;
-    if (data.success) {
-      appendLog({ timestamp: now(), level: 'INFO', message: `[${platformLabel}] 爬取完成!` });
-      platformState[platform].outputFileName = data.output_file;
-      platformState[platform].errorsFileName = data.errors_file || null;
+    const finish = () => {
+      setSpeedEnabled(true);
+      hide($('prepare-indicator'));   // 结果已就绪,撤掉过渡提示
       hide($('btn-stop'));
-      show($('btn-download'));
-      $('completion-banner').classList.add('vis');
-      if (platformState[platform].failedCount > 0) show($('btn-retry'));
-      // 有错误文件才显示"下载错误记录";若平台正显示中则同步切换
-      if (platform === currentPlatform) {
-        if (data.errors_file) show($('btn-download-errors')); else hide($('btn-download-errors'));
+      show($('btn-start')); $('btn-start').disabled = !ps().uploadedFilePath;   // 可再次运行
+      if (data.success) {
+        appendLog({ timestamp: now(), level: 'INFO', message: `[${platformLabel}] 爬取完成!` });
+        platformState[platform].outputFileName = data.output_file;
+        platformState[platform].errorsFileName = data.errors_file || null;
+        show($('btn-download'));
+        $('completion-banner').classList.add('vis');
+        if (platformState[platform].failedCount > 0) show($('btn-retry'));
+        if (platform === currentPlatform) {
+          if (data.errors_file) show($('btn-download-errors')); else hide($('btn-download-errors'));
+        }
+      } else {
+        appendLog({ timestamp: now(), level: 'ERROR', message: `[${platformLabel}] 爬取失败: ${data.error}` });
       }
-    } else {
-      appendLog({ timestamp: now(), level: 'ERROR', message: `[${platformLabel}] 爬取失败: ${data.error}` });
-      hide($('btn-stop'));
-      show($('btn-start'));
-    }
+    };
+    // 若「正在准备结果」刚显示不久(会话异常时存盘很快),延后收尾,保证过渡态可见
+    const showing = !$('prepare-indicator').classList.contains('hidden');
+    const elapsed = Date.now() - prepareShownAt;
+    if (showing && elapsed < PREPARE_MIN_MS) setTimeout(finish, PREPARE_MIN_MS - elapsed);
+    else finish();
   });
 
   // Quick check
@@ -795,7 +806,7 @@
 
   $('btn-stop').addEventListener('click', () => {
     // 立刻给反馈:进入「正在准备结果」过渡态(不再秒显开始按钮);真正就绪由 crawl_complete 收尾
-    hide($('btn-stop')); show($('prepare-indicator'));
+    showPrepare();
     fetch('/api/crawl/stop', { method: 'POST' });
   });
 

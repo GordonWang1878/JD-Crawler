@@ -1265,7 +1265,7 @@ def run_crawl_task_from_rows(input_rows, output_filepath, config):
                             user_stopped = True
                             break
 
-        if user_stopped:
+        if user_stopped and not session_dead:
             emit_log('WARNING', 'Crawl stopped by user')
 
         # 保存 Excel — 按「行身份」回填进磁盘上已有的主文件:
