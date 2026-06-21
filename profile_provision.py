@@ -75,8 +75,10 @@ def list_profiles_status() -> list:
         out.append({
             'id': int(m.group(1)),
             'cooldown': bool(m.group(2)),
-            # 有 Default 子目录 = 曾经登录过(旧数据可能无旁车)
-            'configured': os.path.isdir(os.path.join(path, 'Default')),
+            # 旁车里有昵称 = 真正扫码登录过.不能用「有 Default 子目录」判断——
+            # Chromium 一启动就建 Default,被取消/失败/移除后残留的空 profile 也会有,
+            # 会被误判成「已登录(未取到昵称)」。旁车只在扫码/验证成功时写,可靠.
+            'configured': bool(side.get('nickname')),
             'nickname': side.get('nickname'),
             'scanned_at': side.get('scanned_at'),
         })

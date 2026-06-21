@@ -22,8 +22,26 @@ CDP_PORT = 9222
 CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 
+SIDECAR = '.jd_account.json'
+
+
+def has_login_sidecar(path: str) -> bool:
+    """profile 目录里有带昵称的旁车 = 真正扫码登录过.
+
+    注意:不能用「目录非空 / 有 Default 子目录」判断—— Chromium 一启动就会建
+    Default,所以一个被取消/失败/移除后残留的空 profile 也会有 Default,会被误判
+    成「已登录」。旁车 .jd_account.json 只在扫码/验证成功时写入,是唯一可靠信号.
+    """
+    try:
+        import json
+        with open(os.path.join(path, SIDECAR), encoding='utf-8') as f:
+            return bool(json.load(f).get('nickname'))
+    except Exception:
+        return False
+
+
 def list_available_profiles() -> List[int]:
-    """扫描 pool 目录,返回所有已准备的 profile id(按 ID 排序)."""
+    """扫描 pool 目录,返回所有已登录的 profile id(按 ID 排序)."""
     if not os.path.isdir(POOL_DIR):
         return []
     ids = []
@@ -31,7 +49,7 @@ def list_available_profiles() -> List[int]:
         m = re.match(r'^profile_(\d+)$', name)
         if m:
             path = os.path.join(POOL_DIR, name)
-            if os.path.isdir(path) and os.listdir(path):  # 非空目录才算"已准备"
+            if os.path.isdir(path) and has_login_sidecar(path):  # 真正登录过才算"已准备"
                 ids.append(int(m.group(1)))
     return sorted(ids)
 
