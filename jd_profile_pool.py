@@ -136,7 +136,7 @@ def spawn_chrome(profile_id: int, port: int = CDP_PORT) -> int:
     """
     pdir = profile_dir(profile_id)
     if not os.path.isdir(pdir):
-        raise RuntimeError(f'profile_{profile_id} 不存在,请先运行 prepare_jd_profile_pool.sh')
+        raise RuntimeError(f'profile_{profile_id} 不存在,请先在网页「管理京东账号」里扫码新增,或运行 prepare_jd_profile_pool_patchright.py')
     if not os.listdir(pdir):
         raise RuntimeError(f'profile_{profile_id} 是空目录,可能没扫码登录过')
 
