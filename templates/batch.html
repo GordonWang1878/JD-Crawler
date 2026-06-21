@@ -10,13 +10,39 @@
 <style>
   :root{
     --bg:#161410; --panel:#1C1915; --raise:#231F18; --hair:#322D24; --hair-2:#41382B;
-    --paper:#E6E0D1; --num:#F6F2E8; --muted:#9A917C; --dim:#655D4B; --ink-faint:#655D4B;
+    /* 控件静止边框:极淡(贴近卡片底色),让板块外框 --hair-2 成为唯一显眼的轮廓;hover 才显形 */
+    --ctl-bd:#27231A;
+    /* 文字色阶:从最亮到最暗(用在深色背景上) */
+    --num:#F6F2E8; --paper:#E6E0D1; --muted:#9A917C; --dim:#655D4B;
+    /* 强调色(本身可作文字色,也作背景) */
     --live:#E85D3D; --ok:#A4B27E; --amber:#E8A04D;
-    --t-display:1.8rem; --t-hero:4.2rem; --t-h2:1.06rem; --t-body:.9rem; --t-meta:.78rem; --t-micro:.66rem;
+    /* 亮色/强调色背景上的深色前景(文字 + 图标) */
+    --on-accent:#1A0E08;
+    /* 字号标准化:唯一的一套字阶(9 级)。所有 font-size 都引用下面的 token,
+       不允许再出现一次性 rem 值。改字号 = 改这里。
+       角色→字号约定(同角色必须同字号,勿擅自偏移):
+         t-micro .66 = 密集小标签(表头/徽章/统计标签/计数/日志标签)
+         t-meta  .78 = 次要文字 + 说明 hint + 次级按钮(btn-mini/pact/tab-action…)
+         t-body  .9  = 正文/账号名 + 主操作按钮
+         t-h2    1.05= 区块小标题(01-04)         t-lg 1.25 = 弹窗标题 + 百分比
+         t-xl 1.7 = 统计大数字    t-display 1.8 = 页面主标题
+         t-3xl 2.6 = 汇总计数      t-hero 4.2 = 进度主计数 */
+    --t-2xs:.66rem; --t-xs:.78rem; --t-sm:.9rem;  --t-md:1.05rem; --t-lg:1.25rem;
+    --t-xl:1.7rem;  --t-2xl:1.8rem; --t-3xl:2.6rem; --t-4xl:4.2rem;
+    /* 语义别名(兼容历史用法,指向字阶,不要给别名单独设值) */
+    --t-micro:var(--t-2xs); --t-meta:var(--t-xs);   --t-body:var(--t-sm);
+    --t-h2:var(--t-md);     --t-display:var(--t-2xl); --t-hero:var(--t-4xl);
     --font-num:'IBM Plex Mono',monospace;
+    /* 布局:卡片化版面 —— 每个区域一个圆角矩形,区域间固定间隔 */
+    --gap:14px; --radius:14px;
   }
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Noto Sans SC',sans-serif;background:var(--bg);color:var(--paper);height:100vh;overflow:hidden;font-feature-settings:"tnum" 1}
+  body{font-family:'Noto Sans SC',sans-serif;background:var(--bg);color:var(--paper);height:100vh;overflow:hidden;font-feature-settings:"tnum" 1;display:flex;flex-direction:column;gap:var(--gap);padding:var(--gap)}
+  /* 卡片:6 个区域各用一个圆角矩形框定,底色比页面亮一档以浮起 */
+  .card{background:var(--panel);border:1px solid var(--hair-2);border-radius:var(--radius)}
+  /* 句中高亮 = 唯一样式:加粗 + 黄色。任何 <strong> 都走这套,勿在局部覆盖颜色。
+     例外:.drop strong 是块级标题不是高亮,自带覆盖。 */
+  strong{font-weight:700;color:var(--amber)}
   .gk{font-family:'Space Grotesk',sans-serif}.mo{font-family:'IBM Plex Mono',monospace;font-feature-settings:"tnum" 1}
   .micro{font-family:'IBM Plex Mono',monospace;font-size:var(--t-micro);letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
   .hidden{display:none !important}
@@ -26,43 +52,54 @@
   @keyframes fadeUp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
   /* MASTHEAD */
-  .masthead{display:flex;align-items:center;gap:20px;padding:18px 30px;border-bottom:1px solid var(--hair)}
+  .masthead{display:flex;align-items:center;gap:20px;padding:18px 26px;flex-shrink:0}
   .mark{width:42px;height:42px;border-radius:10px;background:var(--live);display:grid;place-items:center;flex-shrink:0}
-  .mark::after{content:'';width:15px;height:15px;border:2.5px solid #1A0E08;border-radius:3px}
+  .mark::after{content:'';width:15px;height:15px;border:2.5px solid var(--on-accent);border-radius:3px}
   .title-wrap .title{font-weight:700;font-size:var(--t-display);letter-spacing:-.5px;line-height:1.05;color:var(--num)}
   .title-wrap .sub{font-size:var(--t-meta);color:var(--muted);margin-top:4px}
   .mast-sp{flex:1}
-  .plat{display:flex;gap:3px;background:var(--panel);border:1px solid var(--hair);border-radius:8px;padding:3px}
+  .plat{display:flex;gap:3px;background:var(--bg);border:1px solid var(--ctl-bd);border-radius:8px;padding:3px}
   .platform-tab{font-family:'Noto Sans SC';font-size:var(--t-meta);font-weight:500;padding:6px 13px;border-radius:6px;cursor:pointer;color:var(--muted)}
-  .platform-tab.active{color:#1A0E08;background:var(--paper)}
-  .conn{display:flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--hair);border-radius:24px}
+  .platform-tab:hover{color:var(--paper)}
+  .platform-tab.active{color:var(--live);background:rgba(232,93,61,.12)}
+  .conn{position:relative;display:flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--ctl-bd);border-radius:24px}
+  /* 自定义连接状态 tooltip —— 替代原生 title,配深色气泡 + 箭头 */
+  .conn .tip{position:absolute;top:calc(100% + 10px);right:0;width:min(282px,72vw);padding:11px 14px;background:var(--raise);border:1px solid var(--hair-2);border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.5);font-family:'Noto Sans SC';font-size:var(--t-meta);line-height:1.65;letter-spacing:0;color:var(--muted);text-align:left;opacity:0;visibility:hidden;transform:translateY(-5px);transition:opacity .16s ease,transform .16s ease,visibility .16s;z-index:60;pointer-events:none}
+  .conn:hover .tip{opacity:1;visibility:visible;transform:translateY(0)}
+  .conn .tip::before,.conn .tip::after{content:'';position:absolute;right:18px;border:6px solid transparent}
+  .conn .tip::before{bottom:100%;border-bottom-color:var(--hair-2)}
+  .conn .tip::after{bottom:calc(100% - 1px);border-bottom-color:var(--raise)}
   .status-dot{width:8px;height:8px;border-radius:50%;background:var(--dim)}
   .status-dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
   #status-text{font-family:'IBM Plex Mono';font-size:var(--t-meta);color:var(--muted);letter-spacing:.5px}
   .act{display:flex;align-items:center;gap:9px;padding:12px 22px;border:none;border-radius:9px;font-family:'Noto Sans SC';font-weight:600;font-size:var(--t-body);cursor:pointer}
   .act svg{width:13px;height:13px}
-  .btn-start{background:var(--live);color:#1A0E08}
-  .btn-start svg{fill:#1A0E08}
+  .btn-start{background:var(--live);color:var(--on-accent)}
+  .btn-start svg{fill:var(--on-accent)}
   .btn-start:hover:not(:disabled){background:#F26B4B}
   .btn-start:disabled{background:var(--raise);color:var(--dim);cursor:not-allowed}
-  .btn-stop{background:var(--live);color:#1A0E08}.btn-stop svg{fill:#1A0E08}
+  .btn-stop{background:var(--live);color:var(--on-accent)}.btn-stop svg{fill:var(--on-accent)}
   .btn-stop:hover{background:#F26B4B}
   /* 结束采集后生成 Excel 期间的过渡反馈 */
-  .prepare{display:flex;align-items:center;gap:9px;padding:12px 20px;border:1px solid var(--hair-2);border-radius:9px;color:var(--muted);font-size:var(--t-body);font-weight:500;flex-shrink:0;white-space:nowrap}
+  .prepare{display:flex;align-items:center;gap:9px;padding:12px 20px;border:1px solid var(--ctl-bd);border-radius:9px;color:var(--muted);font-size:var(--t-body);font-weight:500;flex-shrink:0;white-space:nowrap}
   .prepare .spin{width:14px;height:14px;border:2px solid var(--hair-2);border-top-color:var(--live);border-radius:50%;animation:spin .7s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
 
-  .body{display:grid;grid-template-columns:32% 68%;height:calc(100vh - 81px)}
-  .col{overflow-y:auto}
-  .col.right{border-left:1px solid var(--hair);display:flex;flex-direction:column}
+  .body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,32fr) minmax(0,68fr);gap:var(--gap)}
+  .col{min-width:0}
+  .col.left{display:flex;flex-direction:column;gap:10px;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none}
+  .col.left::-webkit-scrollbar{display:none}  /* 保留滚动,隐藏滚动条 */
+  .col.right{display:flex;flex-direction:column;min-height:0;overflow:hidden}
 
-  .sec{padding:24px 30px;border-bottom:1px solid var(--hair)}
+  .sec{padding:15px 22px;flex-shrink:0}
   /* 采集进行中:整个设置栏锁定(变暗 + 不可操作),需先停止采集 */
   .col.left.locked .sec{opacity:.45;pointer-events:none;transition:opacity .2s}
   .col.left.locked .speed-opt:disabled{opacity:1}  /* 避免与 sec 的变暗叠加导致过淡 */
-  .sec-h{display:flex;align-items:center;gap:11px;margin-bottom:18px}
+  .sec-h{display:flex;align-items:center;gap:11px;margin-bottom:12px}
   .sec-h .fol{font-family:'IBM Plex Mono';font-size:var(--t-meta);color:var(--live);font-weight:500}
   .sec-h h2{font-weight:700;font-size:var(--t-h2);letter-spacing:.3px;color:var(--num)}
+  /* 工作区标题栏:复用 sec-h 的 h2 样式,无序号,做成右栏顶部标题(带分隔线) */
+  .work-h{flex-shrink:0;margin-bottom:0;padding:14px 22px 4px}
   .sec-h .meta{margin-left:auto}
   /* 每步完成状态指示点:空心=未完成 / 半填=可运行非最佳 / 实心=完成 */
   .step-dot{width:11px;height:11px;border-radius:50%;border:1.5px solid var(--ok);box-sizing:border-box;flex-shrink:0;margin-left:-3px;transition:.2s}
@@ -72,9 +109,11 @@
   .grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:30px}
 
   /* upload */
-  .drop{display:flex;align-items:center;justify-content:center;gap:13px;text-align:center;border:1px solid var(--hair-2);border-radius:8px;padding:16px;cursor:pointer;transition:.2s}
+  .drop{display:flex;align-items:center;justify-content:center;gap:13px;text-align:center;border:1px solid var(--ctl-bd);border-radius:8px;padding:13px;cursor:pointer;transition:.2s}
   .drop-cap{min-width:0}
-  .drop:hover,.drop.dragover{border-color:var(--muted);background:var(--panel)}
+  .drop:not(.uploaded):hover{border-color:var(--muted)}
+  .drop:not(.uploaded):hover strong{color:var(--paper)}
+  .drop.dragover{border-color:var(--muted);background:var(--raise)}
   /* 已载入态 —— 借鉴 Step2 选中态:橙色实线 + 底色,清晰区分"有文件 / 无文件" */
   .drop.uploaded{border-style:solid;border-color:var(--live);background:rgba(232,93,61,.07)}
   .drop.uploaded:hover{border-color:var(--live);background:rgba(232,93,61,.11)}
@@ -84,61 +123,59 @@
   .drop.uploaded strong.cap-done{display:block;color:var(--live)}
   .drop.uploaded .micro.cap-done{display:block}
   .drop svg{width:24px;height:24px;color:var(--muted);margin:0;flex-shrink:0;display:block}
-  .drop strong{display:block;font-size:var(--t-body);font-weight:500;color:var(--paper);line-height:1.25}
+  .drop strong{display:block;font-size:var(--t-body);font-weight:500;color:var(--muted);line-height:1.25}
   .drop .micro{display:block;margin-top:3px;letter-spacing:1px;line-height:1.2}
   .file-badge{display:none;gap:10px;margin-top:12px;justify-content:space-between;align-items:center;padding-top:11px;border-top:1px solid var(--hair)}
   .file-badge.vis{display:flex}
   #file-badge-text{flex:1;min-width:0;font-family:'IBM Plex Mono';font-size:var(--t-meta);color:var(--ok);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .file-badge .micro{flex-shrink:0}
   .template-link{display:inline-flex;align-items:center;gap:6px;margin-top:12px;font-size:var(--t-meta);color:var(--muted)}
-  .template-link svg{width:12px;height:12px}.template-link:hover{color:var(--ok)}
+  .template-link svg{width:12px;height:12px}.template-link:hover{color:var(--paper)}
 
   /* speed */
   .speed-select{display:flex;gap:9px}
-  .speed-opt{flex:1;border:1px solid var(--hair-2);border-radius:8px;padding:13px;text-align:center;cursor:pointer;background:var(--panel);transition:.16s;font-family:inherit}
-  .speed-opt:hover:not(:disabled){border-color:var(--muted)}
+  .speed-opt{flex:1;border:1px solid var(--ctl-bd);border-radius:8px;padding:9px 13px;text-align:center;cursor:pointer;background:var(--raise);transition:.16s;font-family:inherit}
+  .speed-opt:not(.active):hover:not(:disabled){border-color:var(--muted)}
+  .speed-opt:not(.active):hover:not(:disabled) .speed-name{color:var(--paper)}
   .speed-opt.active{border-color:var(--live);background:rgba(232,93,61,.07)}
-  .speed-opt .speed-name{font-size:var(--t-body);font-weight:600;color:var(--paper);display:block}
+  .speed-opt .speed-name{font-size:var(--t-body);font-weight:600;color:var(--muted);display:block}
   .speed-opt.active .speed-name{color:var(--live)}
-  .speed-opt .speed-spec{font-family:'IBM Plex Mono';font-size:var(--t-micro);color:var(--muted);margin-top:4px;display:block}
   .speed-opt:disabled{opacity:.45;cursor:not-allowed}
-  .speed-hint{margin-top:13px;font-size:var(--t-meta);color:var(--muted);line-height:1.6}
-  .speed-hint strong{color:var(--paper);font-weight:500}
+  .speed-hint{margin-top:9px;font-size:var(--t-meta);color:var(--muted);line-height:1.6}
 
   /* fleet/account */
-  .fleet-teaser{font-size:var(--t-meta);color:var(--muted);line-height:1.7;margin-bottom:14px}
-  .fleet-teaser strong{color:var(--ok)}
-  .btn-pool{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;background:transparent;border:1px solid var(--hair-2);border-radius:8px;color:var(--paper);cursor:pointer;font-family:'Noto Sans SC';font-size:var(--t-body);font-weight:500}
+  .fleet-teaser{font-size:var(--t-meta);color:var(--muted);line-height:1.6;margin-bottom:9px}
+  .btn-pool{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;background:transparent;border:1px solid var(--ctl-bd);border-radius:8px;color:var(--muted);cursor:pointer;font-family:'Noto Sans SC';font-size:var(--t-body);font-weight:500}
   .btn-pool svg{width:15px;height:15px}
-  .btn-pool:hover{border-color:var(--ok);color:var(--ok)}
+  .btn-pool:hover{border-color:var(--muted);color:var(--paper)}
 
   /* progress hero */
   .prog{display:flex;align-items:flex-end;gap:16px;padding-bottom:16px;border-bottom:1px solid var(--hair)}
   .prog-cur{font-family:'IBM Plex Mono';font-size:var(--t-hero);font-weight:500;line-height:.84;letter-spacing:-3px;color:var(--num)}
-  .prog-div{font-family:'IBM Plex Mono';font-size:1.05rem;color:var(--dim);margin-bottom:8px}
-  .prog-tot{font-family:'IBM Plex Mono';font-size:1.05rem;color:var(--dim);margin-bottom:8px}
-  .prog-pct{margin-left:auto;font-family:'IBM Plex Mono';font-size:1.25rem;font-weight:500;color:var(--live);margin-bottom:8px}
+  .prog-div{font-family:'IBM Plex Mono';font-size:var(--t-md);color:var(--dim);margin-bottom:8px}
+  .prog-tot{font-family:'IBM Plex Mono';font-size:var(--t-md);color:var(--dim);margin-bottom:8px}
+  .prog-pct{margin-left:auto;font-family:'IBM Plex Mono';font-size:var(--t-lg);font-weight:500;color:var(--live);margin-bottom:8px}
   .track{height:2px;background:var(--hair-2);margin-top:18px;position:relative}
   .fill{position:absolute;left:0;top:-1px;height:4px;width:0;background:var(--live);transition:width .4s}
   .prog-now{margin-top:14px;font-family:'IBM Plex Mono';font-size:var(--t-meta);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .stats{display:grid;grid-template-columns:repeat(4,1fr);margin-top:24px}
   .stat{padding-right:14px;border-right:1px solid var(--hair)}
   .stat:last-child{border:none}
-  .stat .sv{font-family:'IBM Plex Mono';font-size:1.7rem;font-weight:500;color:var(--num);letter-spacing:-1px;display:block}
+  .stat .sv{font-family:'IBM Plex Mono';font-size:var(--t-xl);font-weight:500;color:var(--num);letter-spacing:-1px;display:block}
   .stat.s-ok .sv{color:var(--ok)}.stat.s-fail .sv{color:var(--live)}.stat.s-warn .sv{color:var(--amber)}
   .stat .sl{display:block;font-family:'IBM Plex Mono';font-size:var(--t-micro);letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:5px}
   .post-acts{display:flex;gap:9px;margin-top:22px}
   /* 进度汇总条 —— 右栏顶部,采集结果汇总 */
-  .summary{padding:18px 22px;border-bottom:1px solid var(--hair);flex-shrink:0}
+  .summary{padding:18px 22px;border-bottom:1px solid var(--ctl-bd);flex-shrink:0}
   .sum-row{display:flex;align-items:center;gap:20px}
   .summary .prog{padding-bottom:0;border:none;gap:12px}
-  .summary .prog-cur{font-size:2.6rem;letter-spacing:-2px}
-  .summary .prog-div,.summary .prog-tot{font-size:.95rem;margin-bottom:5px}
-  .summary .prog-pct{margin-left:14px;font-size:1.05rem;margin-bottom:5px}
+  .summary .prog-cur{font-size:var(--t-3xl);letter-spacing:-2px}
+  .summary .prog-div,.summary .prog-tot{font-size:var(--t-sm);margin-bottom:5px}
+  .summary .prog-pct{margin-left:14px;font-size:var(--t-md);margin-bottom:5px}
   .summary .stats{display:flex;gap:22px;margin-top:0;margin-left:auto}
   .summary .act{flex-shrink:0}
   .summary .stat{padding:0;border:none}
-  .summary .stat .sv{font-size:1.3rem}
+  .summary .stat .sv{font-size:var(--t-lg)}
   .summary .track{margin-top:14px}
   .sum-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:12px}
   .summary .prog-now{margin-top:0;flex:1;min-width:0}
@@ -146,34 +183,33 @@
   .summary .done-banner{margin-top:14px}
   .done-banner{display:none;align-items:center;gap:9px;margin-top:18px;padding:10px 14px;border:1px solid rgba(164,178,126,.35);background:rgba(164,178,126,.08);border-radius:8px;color:var(--ok);font-size:var(--t-body);font-weight:500}
   .done-banner.vis{display:flex}.done-banner svg{width:14px;height:14px;fill:none;stroke:var(--ok);stroke-width:1.5}
-  .btn-mini{display:flex;align-items:center;gap:7px;padding:10px 14px;border-radius:8px;font-family:'Noto Sans SC';font-size:var(--t-meta);font-weight:500;cursor:pointer;border:1px solid var(--hair-2);background:transparent}
+  .btn-mini{display:flex;align-items:center;gap:7px;padding:10px 14px;border-radius:8px;font-family:'Noto Sans SC';font-size:var(--t-meta);font-weight:500;cursor:pointer;border:1px solid var(--ctl-bd);background:transparent}
   .btn-mini svg{width:12px;height:12px}
   .btn-retry{color:var(--amber);border-color:rgba(232,160,77,.4)}.btn-retry:hover{background:rgba(232,160,77,.1)}
-  .btn-download{color:#1A0E08;background:var(--ok);border-color:var(--ok)}.btn-download:hover{background:#B5C390}
+  .btn-download{color:var(--on-accent);background:var(--ok);border-color:var(--ok)}.btn-download:hover{background:#B5C390}
   .btn-err-dl{color:var(--live);border-color:rgba(232,93,61,.4)}.btn-err-dl:hover{background:rgba(232,93,61,.08)}
 
   /* quick check */
   .qc-row{display:flex;gap:9px}
-  .qc-input{flex:1;background:var(--panel);border:1px solid var(--hair-2);border-radius:8px;padding:10px 13px;color:var(--paper);font-family:'IBM Plex Mono';font-size:var(--t-meta);outline:none}
+  .qc-input{flex:1;background:var(--panel);border:1px solid var(--ctl-bd);border-radius:8px;padding:10px 13px;color:var(--paper);font-family:'IBM Plex Mono';font-size:var(--t-meta);outline:none}
   .qc-input:focus{border-color:var(--ok)}.qc-input::placeholder{color:var(--dim)}
-  #qc-btn{padding:10px 17px;background:transparent;border:1px solid var(--hair-2);color:var(--paper);border-radius:8px;cursor:pointer;font-family:'Noto Sans SC';font-size:var(--t-meta);font-weight:500}
-  #qc-btn:hover{border-color:var(--ok);color:var(--ok)}#qc-btn:disabled{opacity:.5;cursor:not-allowed}
-  .qc-result{display:none;margin-top:13px;border:1px solid var(--hair);border-radius:8px;overflow:hidden}
+  #qc-btn{padding:10px 17px;background:transparent;border:1px solid var(--ctl-bd);color:var(--muted);border-radius:8px;cursor:pointer;font-family:'Noto Sans SC';font-size:var(--t-meta);font-weight:500}
+  #qc-btn:hover{border-color:var(--muted);color:var(--paper)}#qc-btn:disabled{opacity:.5;cursor:not-allowed}
+  .qc-result{display:none;margin-top:13px;border:1px solid var(--ctl-bd);border-radius:8px;overflow:hidden}
   .qc-result.vis{display:block}
   .qr{display:flex;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--hair);font-size:var(--t-meta)}
   .qr:last-child{border:none}.ql{color:var(--muted)}.qv{font-family:'IBM Plex Mono';color:var(--paper)}
   .qv.ok{color:var(--ok)}.qv.err{color:var(--live)}
 
   /* reset */
-  .btn-reset{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px;background:transparent;border:1px solid var(--hair-2);color:var(--muted);border-radius:8px;cursor:pointer;font-family:'Noto Sans SC';font-size:var(--t-meta)}
+  .btn-reset{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;background:transparent;border:1px solid var(--ctl-bd);color:var(--muted);border-radius:8px;cursor:pointer;font-family:'Noto Sans SC';font-size:var(--t-body);font-weight:500}
   .btn-reset svg{width:14px;height:14px}
-  .btn-reset:hover:not(:disabled){border-color:var(--live);color:var(--live)}
+  .btn-reset:hover:not(:disabled){border-color:var(--muted);color:var(--paper)}
   .btn-reset:disabled{opacity:.5;cursor:not-allowed}
-  .reset-hint{margin-top:10px;font-size:var(--t-micro);color:var(--muted);line-height:1.6;letter-spacing:.2px}
-  .reset-hint strong{color:var(--amber)}
+  .reset-hint{margin-top:8px;font-size:var(--t-meta);color:var(--muted);line-height:1.5;letter-spacing:.2px}
 
   /* right tabs */
-  .tab-bar{display:flex;align-items:center;border-bottom:1px solid var(--hair);flex-shrink:0;padding-right:14px}
+  .tab-bar{display:flex;align-items:center;border-bottom:1px solid var(--ctl-bd);flex-shrink:0;padding-right:14px}
   .tab-item{position:relative;font-size:var(--t-body);font-weight:500;padding:17px 18px;cursor:pointer;color:var(--dim);display:flex;align-items:center;gap:7px}
   .tab-item:hover{color:var(--paper)}
   .tab-item.active{color:var(--num)}
@@ -181,7 +217,7 @@
   .tab-item .tc{font-family:'IBM Plex Mono';font-size:var(--t-micro);color:var(--dim)}
   .tab-item.active .tc{color:var(--live)}
   .tab-spacer{flex:1}
-  .tab-action{background:transparent;border:1px solid var(--hair-2);color:var(--muted);border-radius:7px;padding:6px 12px;font-size:var(--t-meta);cursor:pointer;font-family:'Noto Sans SC'}
+  .tab-action{background:transparent;border:1px solid var(--ctl-bd);color:var(--muted);border-radius:7px;padding:6px 12px;font-size:var(--t-meta);cursor:pointer;font-family:'Noto Sans SC'}
   .tab-action:hover{border-color:var(--muted);color:var(--paper)}
   .tab-content{flex:1;overflow:hidden;position:relative}
   .tab-pane{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden}
@@ -194,9 +230,9 @@
   .table-wrap{flex:1;overflow:auto}
   .data-table{width:100%;border-collapse:collapse;font-size:var(--t-meta)}
   .data-table thead{position:sticky;top:0;z-index:2}
-  .data-table th{text-align:left;font-family:'IBM Plex Mono';font-size:var(--t-micro);letter-spacing:.5px;text-transform:uppercase;color:var(--dim);padding:11px 14px;background:var(--bg);border-bottom:1px solid var(--hair);font-weight:500;white-space:nowrap}
+  .data-table th{text-align:left;font-family:'IBM Plex Mono';font-size:var(--t-micro);letter-spacing:.5px;text-transform:uppercase;color:var(--dim);padding:11px 14px;background:var(--panel);border-bottom:1px solid var(--hair);font-weight:500;white-space:nowrap}
   .data-table td{padding:10px 14px;border-bottom:1px solid var(--hair);color:var(--paper)}
-  .data-table tr:hover td{background:var(--panel)}
+  .data-table tr:hover td{background:var(--raise)}
   .col-idx{color:var(--dim);font-family:var(--font-num);font-size:var(--t-micro);text-align:center}
   .col-sku{font-family:var(--font-num);font-size:var(--t-meta);color:var(--muted)}
   .col-brand{color:var(--muted);white-space:nowrap}
@@ -218,7 +254,7 @@
 
   .log-scroll{flex:1;overflow:auto;padding:8px}
   .log-line{display:grid;grid-template-columns:66px 58px 1fr;gap:11px;align-items:center;padding:7px 12px;font-family:'IBM Plex Mono';font-size:var(--t-meta);border-radius:5px}
-  .log-line:hover{background:var(--panel)}.log-new{animation:fadeUp .2s ease-out}
+  .log-line:hover{background:var(--raise)}.log-new{animation:fadeUp .2s ease-out}
   .lt{color:var(--dim);font-size:var(--t-micro)}
   .ll{font-size:var(--t-micro);letter-spacing:.5px;text-align:center;padding:2px 0;border-radius:3px}
   .ll.INFO{color:var(--muted);background:rgba(154,145,124,.12)}
@@ -228,8 +264,8 @@
   .lv-WARNING .lm{color:var(--amber)}.lv-ERROR .lm{color:var(--live)}
 
   .history-scroll{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
-  .history-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border:1px solid var(--hair);border-radius:9px}
-  .history-row:hover{background:var(--panel)}
+  .history-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border:1px solid var(--ctl-bd);border-radius:9px}
+  .history-row:hover{background:var(--raise)}
   .history-name{font-size:var(--t-body);color:var(--paper);display:flex;align-items:center;gap:7px}
   .history-meta{font-family:'IBM Plex Mono';font-size:var(--t-micro);color:var(--muted);margin-top:5px}
   .history-dl{font-size:var(--t-meta);color:var(--ok);border:1px solid rgba(164,178,126,.3);border-radius:6px;padding:6px 13px;flex-shrink:0}
@@ -240,17 +276,17 @@
   .pool-overlay.vis{display:flex}
   .pool-modal{width:min(580px,92vw);max-height:86vh;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--hair-2);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
   .pool-head{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 22px 16px;border-bottom:1px solid var(--hair)}
-  .pool-title{font-weight:700;font-size:1.2rem;color:var(--num);letter-spacing:.3px}
+  .pool-title{font-weight:700;font-size:var(--t-lg);color:var(--num);letter-spacing:.3px}
   .pool-sub{font-size:var(--t-meta);color:var(--muted);margin-top:5px;line-height:1.5}
-  .pool-x{background:none;border:none;font-size:1.6rem;color:var(--muted);cursor:pointer;line-height:1;padding:0 4px}.pool-x:hover{color:var(--live)}
+  .pool-x{background:none;border:none;font-size:var(--t-xl);color:var(--muted);cursor:pointer;line-height:1;padding:0 4px}.pool-x:hover{color:var(--live)}
   .pool-banner{display:none;align-items:center;justify-content:space-between;gap:12px;margin:14px 22px 0;padding:11px 15px;background:rgba(232,93,61,.08);border:1px solid rgba(232,93,61,.3);border-radius:8px}
   .pool-banner.vis{display:flex}
   .pool-banner-msg{font-size:var(--t-meta);color:var(--live);line-height:1.4}
-  .pool-banner-cancel{flex-shrink:0;background:none;border:1px solid rgba(232,93,61,.4);color:var(--live);border-radius:6px;font-size:var(--t-micro);padding:5px 11px;cursor:pointer}
-  .pool-banner-cancel:hover{background:var(--live);color:#1A0E08}
+  .pool-banner-cancel{flex-shrink:0;background:none;border:1px solid rgba(232,93,61,.4);color:var(--live);border-radius:6px;font-size:var(--t-meta);padding:5px 11px;cursor:pointer}
+  .pool-banner-cancel:hover{background:var(--live);color:var(--on-accent)}
   .pool-list{overflow:auto;padding:16px 22px;display:flex;flex-direction:column;gap:11px;min-height:90px}
-  .pool-empty{text-align:center;color:var(--muted);font-size:var(--t-body);padding:26px 0;line-height:1.7}.pool-empty strong{color:var(--ok)}
-  .pcard{display:flex;align-items:center;gap:13px;padding:13px 15px;background:var(--raise);border:1px solid var(--hair);border-radius:9px}
+  .pool-empty{text-align:center;color:var(--muted);font-size:var(--t-body);padding:26px 0;line-height:1.7}
+  .pcard{display:flex;align-items:center;gap:13px;padding:13px 15px;background:var(--raise);border:1px solid var(--ctl-bd);border-radius:9px}
   .pcard.cool{opacity:.6}
   .pcard-id{font-family:'IBM Plex Mono';font-size:var(--t-meta);color:var(--muted);min-width:62px}
   .pcard-main{flex:1;min-width:0}
@@ -261,20 +297,20 @@
   .pill-cool{color:var(--amber);background:rgba(232,160,77,.14)}
   .pill-empty{color:var(--muted);background:rgba(154,145,124,.14)}
   .pcard-acts{display:flex;gap:6px;flex-shrink:0}
-  .pact{background:transparent;border:1px solid var(--hair-2);color:var(--muted);border-radius:6px;font-size:var(--t-micro);padding:6px 10px;cursor:pointer;white-space:nowrap;font-family:'Noto Sans SC'}
-  .pact:hover:not(:disabled){border-color:var(--ok);color:var(--ok)}
+  .pact{background:transparent;border:1px solid var(--ctl-bd);color:var(--muted);border-radius:6px;font-size:var(--t-meta);padding:6px 10px;cursor:pointer;white-space:nowrap;font-family:'Noto Sans SC'}
+  .pact:hover:not(:disabled){border-color:var(--muted);color:var(--paper)}
   .pact.danger:hover:not(:disabled){border-color:var(--live);color:var(--live)}
   .pact:disabled{opacity:.4;cursor:not-allowed}
   .pool-foot{padding:16px 22px 20px;border-top:1px solid var(--hair)}
-  .pool-add{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;background:var(--live);color:#1A0E08;border:none;border-radius:9px;font-family:'Noto Sans SC';font-weight:600;font-size:var(--t-body);cursor:pointer}
+  .pool-add{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;background:var(--live);color:var(--on-accent);border:none;border-radius:9px;font-family:'Noto Sans SC';font-weight:600;font-size:var(--t-body);cursor:pointer}
   .pool-add:hover:not(:disabled){background:#F26B4B}
   .pool-warn{font-size:var(--t-meta);color:var(--amber);margin-top:11px;line-height:1.5}
 
-  @media(max-width:1000px){.body{grid-template-columns:1fr}.col.right{height:55vh}.masthead{flex-wrap:wrap}}
+  @media(max-width:1000px){body{overflow:auto}.body{display:flex;flex-direction:column}.col.left{overflow:visible}.col.right{height:55vh;flex-shrink:0}.masthead{flex-wrap:wrap}}
 </style>
 </head>
 <body>
-  <div class="masthead">
+  <div class="masthead card">
     <div class="mark"></div>
     <div class="title-wrap">
       <div class="title">电商价格采集</div>
@@ -285,13 +321,15 @@
       <div class="platform-tab active" data-platform="jd">京东</div>
       <div class="platform-tab hidden" data-platform="tmall">天猫淘宝</div>
     </div>
-    <div class="conn"><span id="status-dot" class="status-dot"></span><span id="status-text">连接中</span></div>
+    <div class="conn"><span id="status-dot" class="status-dot"></span><span id="status-text">连接中</span><span class="tip">前端与后端的<strong>实时连接状态</strong>:连通时可实时推送采集日志、进度与结果;显示「已断开」时刷新页面即可重连(后端任务不受影响)。</span></div>
   </div>
 
   <div class="body">
     <div class="col left">
-      <div class="sec">
-        <div class="sec-h"><span class="fol">01</span><h2>数据源</h2><span id="dot-1" class="step-dot s-empty" title="未完成"></span></div>
+      <div class="sec card">
+        <div class="sec-h"><span class="fol">01</span><h2>数据源</h2><span id="dot-1" class="step-dot s-empty" title="未完成"></span><a id="template-link" class="template-link" href="/api/template" download title="下载标准格式 Excel 模板" style="margin:0 0 0 auto">
+          <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 1.5 L6.5 8.5 M3 6 L6.5 9.5 L10 6"/><path d="M2 11 L11 11"/></svg>下载模板
+        </a></div>
         <div id="upload-area" class="drop">
           <svg class="ico-empty" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M12 3v12M8 8l4-5 4 5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke-linecap="round"/></svg>
           <svg class="ico-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12.5l4.5 4.5L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -302,40 +340,38 @@
           <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none">
         </div>
         <div id="file-badge" class="file-badge"><span id="file-badge-text">-</span><span class="micro">已载入</span></div>
-        <a id="template-link" class="template-link" href="/api/template" download title="下载标准格式 Excel 模板">
-          <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 1.5 L6.5 8.5 M3 6 L6.5 9.5 L10 6"/><path d="M2 11 L11 11"/></svg>下载模板
-        </a>
       </div>
 
-      <div class="sec">
+      <div class="sec card">
         <div class="sec-h"><span class="fol">02</span><h2>采集强度</h2><span id="dot-2" class="step-dot s-done" title="已完成"></span></div>
         <div id="speed-select" class="speed-select">
-          <button type="button" class="speed-opt active" data-speed="regular"><span class="speed-name">常规</span><span class="speed-spec">25 / 批</span></button>
-          <button type="button" class="speed-opt" data-speed="fast"><span class="speed-name">快速</span><span class="speed-spec">50 / 批</span></button>
+          <button type="button" class="speed-opt active" data-speed="regular"><span class="speed-name">常规</span></button>
+          <button type="button" class="speed-opt" data-speed="fast"><span class="speed-name">快速</span></button>
         </div>
-        <div id="speed-hint" class="speed-hint">批间冷却 10 分钟 · <strong>最稳</strong>,默认推荐</div>
+        <div id="speed-hint" class="speed-hint">25/批次,同账号批次间冷却 10 分钟。<strong>最稳</strong>,默认推荐</div>
       </div>
 
-      <div class="sec">
+      <div class="sec card">
         <div class="sec-h"><span class="fol">03</span><h2>账号池</h2><span id="dot-3" class="step-dot s-empty" title="未完成"></span><span class="micro meta">账号级风控 · 批间轮换</span></div>
-        <div class="fleet-teaser">每个 profile 对应一个<strong>不同账号</strong>,批间自动轮换、免冷却,以规避账号级风控。在这里扫码、查看登录态、冷却或移除。</div>
+        <div class="fleet-teaser">在这里新增/管理账号、查看登录态、冷却或移除。每个槽位放一个<strong>不同的京东账号</strong>,批次间自动轮换,以规避账号级风险。</div>
         <button id="btn-profiles" class="btn-pool">
           <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="4.5" cy="4" r="2"/><path d="M1 11.5Q1 8 4.5 8Q8 8 8 11.5"/><circle cx="9.5" cy="4.5" r="1.6"/><path d="M9 8Q12 8.2 12 11.5"/></svg>
           管理京东账号
         </button>
       </div>
 
-      <div class="sec">
-        <div class="sec-h"><span class="fol">04</span><h2 style="color:var(--live)">故障恢复</h2></div>
+      <div class="sec card">
+        <div class="sec-h"><span class="fol">04</span><h2>故障恢复</h2></div>
         <button id="btn-reset-browser" class="btn-reset">
           <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M2 6.5Q2 3 6 3Q8 3 9.5 4.5L11 3M11 3L11 6M11 3L8 3"/><path d="M11 6.5Q11 10 7 10Q5 10 3.5 8.5L2 10M2 10L2 7M2 10L5 10"/></svg>
           重置浏览器会话
         </button>
-        <div class="reset-hint">看到 <strong>热身失败</strong>、长时间空闲后再开爬、或关过 chromium 窗口时,点这里清掉旧会话。</div>
+        <div class="reset-hint">当看到<strong>热身失败</strong>,或因 chromium 窗口失效或退出导致无法开始采集时,点这里重置浏览器会话。</div>
       </div>
     </div>
 
-    <div class="col right">
+    <div class="col right card">
+      <div class="sec-h work-h"><h2>工作台</h2></div>
       <div class="summary">
         <div class="sum-row">
           <div class="prog"><span id="progress-text" class="prog-cur">0</span><span class="prog-div">/</span><span id="progress-total-num" class="prog-tot">0</span><span id="progress-percent" class="prog-pct">0%</span></div>
@@ -416,7 +452,7 @@
       <div class="pool-head">
         <div>
           <div class="pool-title">京东账号池</div>
-          <div class="pool-sub">每个 profile = 一个独立京东账号 · 批间自动轮换以规避账号级风控</div>
+          <div class="pool-sub">每个槽位一个独立京东账号 · 批间自动轮换以规避账号级风控</div>
         </div>
         <button id="pool-close" class="pool-x" aria-label="关闭">&times;</button>
       </div>
@@ -463,8 +499,8 @@
   // ===== 爬取强度 =====
   let selectedSpeed = 'regular';
   const SPEED_HINTS = {
-    regular:  '批间冷却 10 分钟 · <strong>最稳</strong>,默认推荐',
-    fast:     '批间冷却 10 分钟 · 约<strong>快一倍</strong>,风控风险略升',
+    regular:  '25/批次,同账号批次间冷却 10 分钟。<strong>最稳</strong>,默认推荐',
+    fast:     '50/批次,同账号批次间冷却 10 分钟。采集效率提升,<strong>风控风险升高</strong>',
   };
   document.querySelectorAll('.speed-opt').forEach(opt => {
     opt.addEventListener('click', () => {
@@ -695,7 +731,7 @@
 
   // Preview
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const dash = '<span style="color:var(--ink-faint)">—</span>';
+  const dash = '<span style="color:var(--dim)">—</span>';
 
   function loadPreview() {
     fetch(api().preview).then(r => r.json()).then(data => {
@@ -753,9 +789,9 @@
     };
     const badge = statusMap[row.status] || `<span class="badge badge-fail">${sealFail}未知</span>`;
     const price = row.original_price && row.original_price !== '-'
-      ? `<span class="col-price">\u00a5${row.original_price}</span>` : '<span style="color:var(--ink-faint)">—</span>';
+      ? `<span class="col-price">\u00a5${row.original_price}</span>` : '<span style="color:var(--dim)">—</span>';
     const promo = row.promo_price && row.promo_price !== '-'
-      ? `<span class="col-promo">\u00a5${row.promo_price}</span>` : '<span style="color:var(--ink-faint)">—</span>';
+      ? `<span class="col-promo">\u00a5${row.promo_price}</span>` : '<span style="color:var(--dim)">—</span>';
 
     const urlCell = row.url
       ? `<a href="${esc(row.url)}" target="_blank" rel="noopener" title="${esc(row.url)}">${esc(row.url)}</a>`
@@ -939,6 +975,16 @@
   // ===== 账号池管理 =====
   const poolOverlay = $('pool-overlay');
   let poolBusy = false;  // 扫码/验证进行中
+  let lastAccts = [];    // 上次渲染出的真实账号列表(供 displayName 把 id → 「账号 N」)
+
+  // profile 是内部实现(一个 Chromium 目录),对用户只暴露「账号」。
+  // 旁车昵称缺失时会回退写成字面量「已登录」,这种当作没昵称处理。
+  function realNick(p) { return p && p.nickname && p.nickname !== '已登录' ? p.nickname : null; }
+  function displayName(id) {
+    const i = lastAccts.findIndex(p => p.id === id);
+    if (i < 0) return '新账号';                       // 正在扫的新账号,还没进列表
+    return realNick(lastAccts[i]) || ('账号 ' + (i + 1));
+  }
 
   $('btn-profiles').addEventListener('click', openPool);
   $('pool-close').addEventListener('click', closePool);
@@ -953,13 +999,15 @@
 
   function renderPool(data) {
     const list = $('pool-list'), warn = $('pool-warn');
-    const profs = data.profiles || [];
-    list.innerHTML = profs.length
-      ? profs.map(cardHtml).join('')
-      : '<div class="pool-empty">还没有配置任何账号。<br>点下方「扫码新增账号」,每个 profile 扫一个<strong>不同</strong>的京东账号。</div>';
-    const usable = profs.filter(p => !p.cooldown && p.configured).length;
+    // 只展示真实登录过的账号;空壳/残留槽位(扫码取消/失败留下的)不向用户暴露
+    const accts = (data.profiles || []).filter(p => p.configured);
+    lastAccts = accts;
+    list.innerHTML = accts.length
+      ? accts.map((p, i) => cardHtml(p, i + 1)).join('')
+      : '<div class="pool-empty">还没有配置任何账号。<br>点下方「扫码新增账号」,每个都扫一个<strong>不同</strong>的京东账号。</div>';
+    const usable = accts.filter(p => !p.cooldown).length;
     if (data.crawling) warn.textContent = '⚠ 正在爬取,账号配置已锁定,停止后可操作。';
-    else if (usable < 2) warn.textContent = `⚠ 当前 ${usable} 个可用账号,不足 2 个无法账号交替(会退回单账号+10分钟冷却)。建议凑满 2 个不同账号。`;
+    else if (usable < 2) warn.textContent = `⚠ 当前只有 ${usable} 个可用账号。当不足 2 个账号时无法激活账号交替模式(只能采用单账号+10分钟冷却模式)。建议添加到至少 2 个账号。`;
     else warn.textContent = `✓ ${usable} 个可用账号,批间将自动轮换。`;
     const lock = poolBusy || !!data.crawling;
     list.querySelectorAll('[data-act]').forEach(b => {
@@ -975,32 +1023,30 @@
     $('pool-add').disabled = lock;
   }
 
-  function cardHtml(p) {
-    let pill, name, meta;
+  function cardHtml(p, n) {
+    // 这里只会收到 configured 的真实账号(空壳已在 renderPool 过滤)
+    const name = realNick(p) || '未命名';
+    let pill, meta;
     if (p.cooldown) {
       pill = '<span class="pcard-pill pill-cool">❄ 冷却中</span>';
-      name = p.nickname || '(已配置)';
       meta = '已移出轮换' + (p.scanned_at ? ' · ' + p.scanned_at : '');
-    } else if (p.configured) {
-      pill = '<span class="pcard-pill pill-ok">✓ 已登录</span>';
-      name = p.nickname || '(未取到昵称)';
-      meta = p.scanned_at ? '扫码于 ' + p.scanned_at : '';
     } else {
-      pill = '<span class="pcard-pill pill-empty">空槽位</span>'; name = '未扫码'; meta = '';
+      pill = '<span class="pcard-pill pill-ok">✓ 已登录</span>';
+      meta = p.scanned_at ? '扫码于 ' + p.scanned_at : '';
     }
     const coolBtn = p.cooldown
       ? `<button class="pact" data-act="cooldown" data-id="${p.id}" data-on="0">恢复</button>`
       : `<button class="pact" data-act="cooldown" data-id="${p.id}" data-on="1">冷却</button>`;
-    const verifyBtn = (p.configured && !p.cooldown)
-      ? `<button class="pact" data-act="verify" data-id="${p.id}">验证</button>` : '';
+    const verifyBtn = p.cooldown
+      ? '' : `<button class="pact" data-act="verify" data-id="${p.id}">验证</button>`;
     return `<div class="pcard ${p.cooldown?'cool':''}">
-      <div class="pcard-id">profile_${p.id}</div>
+      <div class="pcard-id">账号 ${n}</div>
       <div class="pcard-main">
         <div class="pcard-name">${pill}${esc(name)}</div>
         <div class="pcard-meta">${esc(meta)}</div>
       </div>
       <div class="pcard-acts">
-        <button class="pact" data-act="scan" data-id="${p.id}">${p.configured?'重扫':'扫码'}</button>
+        <button class="pact" data-act="scan" data-id="${p.id}">重扫</button>
         ${verifyBtn}${coolBtn}
         <button class="pact danger" data-act="remove" data-id="${p.id}">移除</button>
       </div>
@@ -1025,7 +1071,7 @@
     poolPost('/api/profiles/cooldown', {id, on}).then(d => d.error ? showBanner(d.error, false) : loadProfiles());
   }
   function removeProfile(id) {
-    if (!confirm('移除 profile_' + id + '?(目录会移到 .removed 备份,可恢复)')) return;
+    if (!confirm('移除「' + displayName(id) + '」?(可恢复,数据会移到备份目录)')) return;
     poolPost('/api/profiles/remove', {id}).then(d => d.error ? showBanner(d.error, false) : loadProfiles());
   }
   function renderLock() {
@@ -1042,7 +1088,7 @@
 
   socket.on('profile_scan', d => {
     const terminal = ['success','timeout','cancelled','error','verified_ok','verified_expired'];
-    showBanner(`profile_${d.id}:${d.message}`, d.stage === 'waiting');
+    showBanner(`${displayName(d.id)}:${d.message}`, d.stage === 'waiting');
     if (terminal.includes(d.stage)) {
       poolBusy = false;
       const good = (d.stage === 'success' || d.stage === 'verified_ok');
