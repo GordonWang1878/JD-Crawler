@@ -54,7 +54,7 @@
   /* MASTHEAD */
   .masthead{display:flex;align-items:center;gap:20px;padding:18px 26px;flex-shrink:0}
   .mark{width:42px;height:42px;border-radius:10px;background:var(--live);display:grid;place-items:center;flex-shrink:0}
-  .mark::after{content:'';width:15px;height:15px;border:2.5px solid var(--on-accent);border-radius:3px}
+  .mark svg{width:24px;height:24px;fill:none;stroke:var(--on-accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
   .title-wrap .title{font-weight:700;font-size:var(--t-display);letter-spacing:-.5px;line-height:1.05;color:var(--num)}
   .title-wrap .sub{font-size:var(--t-meta);color:var(--muted);margin-top:4px}
   .mast-sp{flex:1}
@@ -311,7 +311,12 @@
 </head>
 <body>
   <div class="masthead card">
-    <div class="mark"></div>
+    <div class="mark" title="电商价格采集">
+      <svg viewBox="0 0 24 24" aria-label="电商价格采集 Logo">
+        <path d="M12 2.8 L18.4 8.6 V19.5 A1.8 1.8 0 0 1 16.6 21.3 H7.4 A1.8 1.8 0 0 1 5.6 19.5 V8.6 Z"/>
+        <circle cx="12" cy="7.2" r="1.25"/>
+      </svg>
+    </div>
     <div class="title-wrap">
       <div class="title">电商价格采集</div>
       <div class="sub">批量抓取电商商品价格 · 当前支持京东</div>
