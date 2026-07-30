@@ -65,6 +65,8 @@ Tmall flow is parallel (`/api/tmall/*`) but uses `tmall_crawler_instance` and `T
 
 **Per-batch account alternation (the throughput strategy).** Because the block is account-level and the regular pace (25/batch + 10-min cooldown) already keeps one account safe, the real cost is the cooldown idle time. So between batches the crawler calls `crawler.rotate_profile()` (wrap-around rotation among *logged-in* profiles) to switch to the **next account** and keep crawling — the just-used account then rests for the duration of the other's batch (~21 min ≫ the proven-safe 10 min), so it never hits the penalty state and there's **no idle cooldown**. Inter-batch logic has three branches: pool-exhausted (`current_profile_id is None`) → cooldown to let accounts heal; rotation succeeded → no wait; only one usable account → fall back to the proven 600s cooldown (and set `single_account_mode` so it stops re-attempting rotation against logged-out profiles). Effect: ~12h → ~8h for 570 items on 2 accounts. **`rotate_profile` is offline-validated; end-to-end alternation still needs a pool provisioned with 2 distinct accounts to verify live.**
 
+**Provisioning is web-based; the sidecar is the source of truth.** Scan / verify / cooldown / remove are driven from the UI 管理京东账号 dialog (`profile_provision.py`, `/api/profiles/*`); the terminal `prepare_jd_profile_pool_patchright.py` still works but the dialog is the normal path. A successful scan writes a sidecar `profile_N/.jd_account.json` (`{nickname, scanned_at}`). That sidecar — **not** the existence of a `Default/` dir — is the authoritative "this profile holds a logged-in account" signal (see gotcha 10). The UI presents profiles to the user as **「账号 N」 + nickname**; `profile` is an internal detail (a Chromium user-data-dir) and is never shown — keep it that way when editing the dialog. Remove renames the dir to `profile_N.removed.<ts>` (recoverable).
+
 Manual cooldown for a burned profile: `mv jd_chrome_profile_pool/profile_1 jd_chrome_profile_pool/profile_1.cooldown` (rename back after 24-48h — frequency control is time-based and self-heals).
 
 ## Non-obvious gotchas (read before editing)
@@ -109,7 +111,11 @@ It navigates to `home.jd.com` (我的京东), NOT `order.jd.com` (订单中心).
 
 ### 9. Kill chromium with `pkill -f 'Chrome for Testing'`, not `'Chromium'`
 
-patchright's process is `Google Chrome for Testing` (the path only has lowercase `chromium-1217`). `pkill -f 'Chromium'` (capital C) matches **zero** processes, so for a long time `reset_browser` never actually killed anything — zombie chromiums piled up holding profile `user-data-dir` locks. Use `_kill_stale_browser_processes()` (pattern `Chrome for Testing` / `chrome_crashpad` / `chromedriver`).
+patchright's process is `Google Chrome for Testing` (the path only has lowercase `chromium-<build>`, e.g. `chromium-1228`; the build number changes on every patchright upgrade, so never match on it). `pkill -f 'Chromium'` (capital C) matches **zero** processes, so for a long time `reset_browser` never actually killed anything — zombie chromiums piled up holding profile `user-data-dir` locks. Use `_kill_stale_browser_processes()` (pattern `Chrome for Testing` / `chrome_crashpad` / `chromedriver`).
+
+### 10. "Logged in" is decided by the sidecar, never by a `Default/` dir
+
+`profile_provision.list_profiles_status()` (the `configured` field) and `jd_profile_pool.list_available_profiles()` decide whether a profile holds a logged-in account by reading the sidecar `profile_N/.jd_account.json` (written only on successful scan/verify), via `jd_profile_pool.has_login_sidecar()`. **Do not** use `os.path.isdir(.../Default)` or "dir is non-empty" — Chromium creates `Default/` on every launch, so a cancelled/failed scan (or a freshly-removed slot that got re-spawned) leaves an empty shell that the dir-heuristic mis-reads as "✓ 已登录 (未取到昵称)"; worse, `list_available_profiles()` then hands that logged-out profile to the crawler → instant 403. The sidecar's `nickname` may be the literal `'已登录'` fallback when the real nickname couldn't be scraped — the UI treats that as "未命名", still a valid logged-in account.
 
 ## Cross-platform note
 
