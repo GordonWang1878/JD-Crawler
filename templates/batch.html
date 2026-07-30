@@ -698,7 +698,11 @@
   // Upload
   const uploadArea = $('upload-area');
   const fileInput = $('file-input');
-  uploadArea.addEventListener('click', () => fileInput.click());
+  // 开选择器前必须清空 value:input[type=file] 的 change 只在「选中项变化」时触发,
+  // 不清空的话重新选同一个路径 = value 没变 = change 不派发 = 整次上传静默没发生
+  // (界面还停在上次结果,看起来像"缓存没刷新",实际是请求压根没发出去)。
+  // 文件内容改了但路径没变,正是最容易踩到的场景。
+  uploadArea.addEventListener('click', () => { fileInput.value = ''; fileInput.click(); });
   fileInput.addEventListener('change', e => { if (e.target.files.length) uploadFile(e.target.files[0]); });
   uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
   uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
