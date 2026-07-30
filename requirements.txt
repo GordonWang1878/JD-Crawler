@@ -17,7 +17,7 @@ pandas==2.1.4
 
 # 京东爬虫(patchright 版,主) — 反检测 Playwright fork
 # 安装后还需运行: patchright install chromium
-patchright>=1.59.0
+patchright>=1.61.2
 
 # 天猫爬虫 + 旧京东 selenium 版(已被 patchright 取代,保留作 fallback)
 selenium==4.16.0
