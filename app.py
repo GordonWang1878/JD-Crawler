@@ -387,9 +387,9 @@ def api_crawl_start():
     profiles = jd_profile_pool.list_available_profiles()
     if not profiles:
         return jsonify({
-            'error': ('JD profile 池为空.请先在项目目录终端运行(一次):\n'
-                      '    python3 prepare_jd_profile_pool_patchright.py 3\n\n'
-                      '按提示给每个 profile 扫码登录京东.')
+            'error': ('京东账号池为空.请先在左侧「03 账号池」→「管理京东账号」'
+                      '→「＋ 扫码新增账号」用手机京东扫码登录一个账号.\n'
+                      '每个槽位要放不同的京东账号(403 频控是账号级的).')
         }), 400
 
     data = request.json

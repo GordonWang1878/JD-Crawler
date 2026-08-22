@@ -1,6 +1,6 @@
 # 配环境 + 跑起来
 
-> 从另一台电脑拉下代码后，按这份文档操作。10-20 分钟搞定。
+> 从另一台电脑拉下代码后，按这份文档操作。10 分钟装完就能开服务。
 > 适用：macOS（已验证）。Linux/Windows 可参考但 Chrome 路径需要自己调。
 
 ## 0. 前置依赖
@@ -30,23 +30,7 @@ patchright install chromium
 
 这会下载约 100MB 到 `~/Library/Caches/ms-playwright/`。这个独立 Chromium **不影响你日常的 Chrome**。
 
-## 4. 准备京东 profile 池（首次配置，5-10 分钟）
-
-京东反爬严，需要预备 3 个独立 profile 轮转。每个 profile 需要你手动扫码登录一次：
-
-```bash
-python3 prepare_jd_profile_pool_patchright.py 3
-```
-
-按提示操作：
-- 弹出 chromium 窗口 → 扫码登录京东 → 回终端按回车关闭 → 进入下一个 profile
-- 3 个 profile 可以用同一个京东账号登录（每个 profile 在京东那里是独立"身份"）
-
-完成后 `jd_chrome_profile_pool/profile_1/2/3` 都会有登录态。这步**只做一次**，profile 持久化。
-
-> 💡 如果想多准备几个 profile（爬量大时切换更多）：`python3 prepare_jd_profile_pool_patchright.py 5`
-
-## 5. 启动 Web 服务
+## 4. 启动 Web 服务
 
 ```bash
 python3 app.py
@@ -54,14 +38,18 @@ python3 app.py
 
 浏览器打开 [http://localhost:5001](http://localhost:5001)
 
-## 6. 跑起来
+## 5. 跑起来
 
 ### 京东批量爬取
-1. 左 panel 选「京东」tab
-2. **下载模板** → 填入你要爬的商品 URL（也支持只填 ProductKey）→ 上传
-3. 点「开始爬取」
-4. crawler 自动 spawn `profile_1` 的 chromium → 跑 → 连续 3 次失败时自动切换 `profile_2/3`
+1. **配京东账号**（只有第一次要做）：左侧「03 账号池」→「管理京东账号」→「＋ 扫码新增账号」→ 手机京东扫码，登录态后台自动识别。同一对话框可验证、冷却、移除、重扫。
+2. 左 panel 选「京东」tab
+3. **下载模板** → 填入你要爬的商品 URL（也支持只填 ProductKey）→ 上传
+4. 点「开始爬取」
 5. 跑完下载 Excel；如果有失败项，点「重试失败项」自动补完
+
+账号池两个要点：
+- **一个槽位放一个不同的京东账号**。403 频控是账号级的，同账号换槽位照样被拦，轮换等于白做（2026-06 对照实测：同 IP + 不同账号 = 正常；同账号 + 不同 profile = 仍 403）。详见 `CLAUDE.md` 第 64 行与 `JD_反爬演进史.md` Phase 9-10。
+- 只有 1 个账号也能跑，只是批次间没得轮换，回落到 600 秒冷却。之后拿到新账号随时在 UI 里加。
 
 ### 天猫批量爬取（独立模块）
 1. 左 panel 切到「天猫淘宝」tab
@@ -93,11 +81,7 @@ python3 app.py
 lsof -ti :5001 | xargs kill -9
 ```
 
-**清理京东 profile 池重新扫码**（profile 累积风控分到全部失效时）：
-```bash
-rm -rf jd_chrome_profile_pool
-python3 prepare_jd_profile_pool_patchright.py 3
-```
+**账号全部失效要重来**（profile 累积风控分到全部被拦时）：在「管理京东账号」对话框里逐个「移除」再「＋ 扫码新增账号」，不要手删 `jd_chrome_profile_pool/`。
 
 **清掉旧的输出文件**：
 ```bash
@@ -114,7 +98,7 @@ lsof -ti :9222 | xargs kill -9
 ## 故障排查
 
 ### 京东第 1 条就 `reason=403`
-- 检查 `jd_chrome_profile_pool/profile_1` 是不是有登录态（用 `prepare_jd_profile_pool_patchright.py` 重做一次）
+- 打开「管理京东账号」看该账号是不是「已登录」，点「验证」复核；掉登录态就「重扫」
 - 用同一账号登录你日常 Chrome 试访问 `https://item.jd.com/100015253059.html`：如果日常 Chrome 也被拦 → 账号被深度风控，等 24-48 小时或换账号
 
 ### 天猫每条都 `slider=True`
@@ -141,7 +125,7 @@ JD-Crawler/
 ├── jd_crawler_via_search.py                    # 京东爬虫(selenium 旧版,fallback)
 ├── jd_profile_pool.py                          # 京东 profile 池工具
 ├── tmall_crawler.py                            # 天猫爬虫(selenium + undetected-chromedriver)
-├── prepare_jd_profile_pool_patchright.py       # 初始化京东 profile 池(扫码)
+├── profile_provision.py                        # 账号池扫码/验证/冷却/移除(UI 后端)
 ├── templates/batch.html                        # 前端单页
 ├── requirements.txt
 └── outputs/                                    # 爬取结果 Excel(gitignore)
@@ -153,7 +137,7 @@ JD-Crawler/
 
 ## 跨平台说明
 
-`prepare_jd_profile_pool_patchright.py` 用 patchright 启动 chromium，**跨平台通用**（不依赖 Mac 路径）。
+京东账号池扫码走 patchright 启动的 chromium，**跨平台通用**（不依赖 Mac 路径）。
 
 `tmall_crawler.py` 和旧 `jd_crawler_via_search.py` 用 undetected-chromedriver，需要本地装 Chrome，**Mac 路径已硬编码**：
 
