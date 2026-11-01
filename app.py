@@ -1943,4 +1943,5 @@ if __name__ == '__main__':
     print("\nOpen: http://localhost:5001")
     print("\nPress Ctrl+C to stop\n")
 
-    socketio.run(app, debug=False, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
+    host = os.environ.get('JD_CRAWLER_HOST', '127.0.0.1')
+    socketio.run(app, debug=False, host=host, port=5001, allow_unsafe_werkzeug=True)

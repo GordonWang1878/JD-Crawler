@@ -32,6 +32,8 @@ python3 app.py
 
 浏览器打开 http://localhost:5001
 
+默认只允许本机访问；需要局域网访问时设置 `JD_CRAWLER_HOST=0.0.0.0`（例如 `JD_CRAWLER_HOST=0.0.0.0 python3 app.py`）。
+
 ### 首次使用流程
 
 1. 上传 Excel(数据格式见下)
